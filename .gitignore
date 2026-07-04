@@ -1,0 +1,38 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.log
+
+# Generated outputs
+output.txt
+missing_terms.json
+audit_report.json
+translation_graph.png
+glossary.xlsx
+glossary_classified.xlsx
+glossary_grouped_by_type.xlsx
+
+# Backups
+*.bak
+glossary.csv.bak
+
+# Local tooling
+.claude/
