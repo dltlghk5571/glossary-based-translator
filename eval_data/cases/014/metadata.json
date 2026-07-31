@@ -1,0 +1,51 @@
+{
+  "id": "014",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_korean/korean14.txt",
+  "original_english_file": "sample_instagram_english/english14.txt",
+  "post_type": "notice",
+  "topic": "student_council",
+  "split": "optimization",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": false,
+  "has_urls": false,
+  "hashtags": [],
+  "mentions": [],
+  "urls": [],
+  "dates": [
+    "2025.09.05",
+    "2025.12.19"
+  ],
+  "times": [
+    "16:00",
+    "18:30",
+    "20:00"
+  ],
+  "numbers": [
+    "2024",
+    "9",
+    "2025",
+    "09",
+    "05",
+    "2025",
+    "12",
+    "19",
+    "3",
+    "16",
+    "00",
+    "18",
+    "30",
+    "20",
+    "00",
+    "8",
+    "1"
+  ],
+  "char_count_ko": 392,
+  "char_count_en": 900,
+  "line_count_ko": 14,
+  "line_count_en": 14,
+  "manual_review_required": false,
+  "notes": ""
+}

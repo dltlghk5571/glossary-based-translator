@@ -1,5 +1,4 @@
 import re
-import time
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -37,19 +36,6 @@ class TranslationState(TypedDict, total=False):
 
     warnings: list
     repair_count: int
-
-
-def _generate_with_retry(model, prompt, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            if "429" in str(e) and attempt < max_retries - 1:
-                time.sleep((attempt + 1) * 5)
-                continue
-            raise
-    return ""
 
 
 def build_user_message(high_priority_terms):
@@ -124,11 +110,15 @@ def _read_multiline_input():
     return "\n".join(lines)
 
 
-def make_nodes(model):
-    """Build the graph's node functions, closing over the Gemini model."""
+def make_nodes(generate_fns):
+    """Build the graph's node functions.
 
-    def generate(prompt):
-        return _generate_with_retry(model, prompt)
+    generate_fns is a dict {"term_extraction": fn, "translation": fn,
+    "repair": fn}, each a generate(prompt) -> text callable (see
+    llm_providers.build_generate_fns). Nodes that don't call an LLM work fine
+    with generate_fns=None (e.g. for offline tests or graph visualization).
+    """
+    generate_fns = generate_fns or {}
 
     def load_glossary(state):
         glossary = gm.load_glossary(state["glossary_path"])
@@ -141,7 +131,9 @@ def make_nodes(model):
         return {}
 
     def extract_candidate_terms(state):
-        candidates = term_extractor.extract_candidate_terms(state["raw_text"], generate)
+        candidates = term_extractor.extract_candidate_terms(
+            state["raw_text"], generate_fns["term_extraction"]
+        )
         return {"candidate_terms": candidates}
 
     def match_existing_glossary_terms(state):
@@ -251,7 +243,7 @@ def make_nodes(model):
 
     def translate_text(state):
         prompt = build_translation_prompt(state["protected_text"])
-        return {"translation_draft": generate(prompt).strip()}
+        return {"translation_draft": generate_fns["translation"](prompt).strip()}
 
     def restore_placeholders(state):
         text = state["translation_draft"]
@@ -271,7 +263,7 @@ def make_nodes(model):
 
     def repair_translation(state):
         corrected = audit_mod.repair_translation(
-            generate,
+            generate_fns["repair"],
             state["raw_text"],
             state["final_translation"],
             state["audit_report"]["violations"],
@@ -283,10 +275,12 @@ def make_nodes(model):
 
     def finalize_output(state):
         warnings = list(state.get("warnings", []))
-        if state.get("audit_report", {}).get("has_violation"):
+        audit_report = state.get("audit_report", {})
+        if audit_report.get("has_violation"):
             warnings.append(
                 f"Glossary violations remained after {state.get('repair_count', 0)} repair attempt(s)."
             )
+        warnings.extend(audit_report.get("format_warnings", []))
         return {"warnings": warnings}
 
     return {
@@ -318,8 +312,8 @@ def _audit_branch(state):
     return "finalize_output"
 
 
-def build_graph(model=None):
-    nodes = make_nodes(model)
+def build_graph(generate_fns=None):
+    nodes = make_nodes(generate_fns)
     graph = StateGraph(TranslationState)
     for name, fn in nodes.items():
         graph.add_node(name, fn)
@@ -360,24 +354,24 @@ def build_graph(model=None):
     return graph
 
 
-def save_graph_png(path="translation_graph.png", model=None):
+def save_graph_png(path="translation_graph.png", generate_fns=None):
     """Render the compiled graph to a PNG for visual inspection.
 
     This is a generated artifact (see .gitignore) -- regenerate it with:
         python -c "from translation_graph import save_graph_png; save_graph_png()"
     """
-    compiled = build_graph(model).compile()
+    compiled = build_graph(generate_fns).compile()
     png_bytes = compiled.get_graph().draw_mermaid_png()
     with open(path, "wb") as f:
         f.write(png_bytes)
     return path
 
 
-def run_pipeline(raw_text, glossary_path, model, interactive=True, thread_id="cli-session"):
+def run_pipeline(raw_text, glossary_path, generate_fns, interactive=True, thread_id="cli-session"):
     """Compile and run the graph, driving any interrupt()/Command(resume=...)
     round-trip through stdin. Returns the final state dict.
     """
-    graph = build_graph(model)
+    graph = build_graph(generate_fns)
     app = graph.compile(checkpointer=MemorySaver())
     config = {"configurable": {"thread_id": thread_id}}
 

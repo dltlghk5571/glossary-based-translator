@@ -40,17 +40,34 @@ keys:
 """
 
 
-TRANSLATION_PROMPT = """Translate the following Korean student society document into natural English.
+TRANSLATION_PROMPT = """Translate the following Korean student society Instagram caption into
+natural English for an international KAIST student audience.
 
-Rules:
+Glossary rules:
 1. Use the glossary translations exactly.
 2. Do not paraphrase glossary terms.
-3. Preserve institutional, procedural, electoral, financial, and regulatory meaning.
-4. Use formal but readable English.
-5. Do not add information not present in the source.
-6. Preserve placeholders exactly, such as __TERM_001__, __TERM_002__.
-7. Do not translate, modify, split, or remove placeholders.
-8. Keep the tone appropriate for student society documents.
+3. Preserve placeholders exactly, such as __TERM_001__, __TERM_002__.
+4. Do not translate, modify, split, or remove placeholders.
+5. Translate Korean student-governance terms consistently throughout the text.
+
+Caption formatting rules:
+6. Preserve the caption's structure: keep the same line breaks, blank lines, and
+   bullet/numbered list formatting as the source.
+7. Keep emojis in place unless they would obstruct a formal instruction (e.g. inside a
+   date, deadline, or amount) -- when in doubt, keep the emoji.
+8. Preserve all @mentions, #hashtags, and URLs exactly as written -- do not translate,
+   drop, or alter them, and never invent new ones.
+9. Preserve all dates, times, numbers, deadlines, locations, and contact info exactly
+   (natural reformatting such as "12월" -> "December" or "20:30" -> "8:30 PM" is fine,
+   but never drop, invent, or change the underlying value).
+10. Render a bracketed or title-like first line (e.g. "[공지] ...") as a natural English
+    title, not a literal word-for-word translation.
+11. Never invent links, dates, departments, or event details not present in the source.
+
+Tone:
+12. Use a tone that is formal enough for an official student-council notice but still
+    warm and accessible, matching the friendly register of an Instagram caption -- do
+    not make it stiffer or more bureaucratic than the Korean original.
 
 Source Text:
 \"\"\"

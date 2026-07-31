@@ -1,0 +1,48 @@
+{
+  "id": "017",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_korean/korean17.txt",
+  "original_english_file": "sample_instagram_english/english17.txt",
+  "post_type": "event",
+  "topic": "event",
+  "split": "holdout",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": true,
+  "has_urls": false,
+  "hashtags": [],
+  "mentions": [
+    "@gemini_kaist",
+    "@kaist_kamf"
+  ],
+  "urls": [],
+  "dates": [
+    "10월 8일"
+  ],
+  "times": [
+    "오후 1시",
+    "오후 6시"
+  ],
+  "numbers": [
+    "2025",
+    "2025",
+    "2025",
+    "2",
+    "1",
+    "10",
+    "8",
+    "5",
+    "6",
+    "1",
+    "6",
+    "1",
+    "3"
+  ],
+  "char_count_ko": 422,
+  "char_count_en": 700,
+  "line_count_ko": 17,
+  "line_count_en": 19,
+  "manual_review_required": false,
+  "notes": ""
+}

@@ -1,0 +1,43 @@
+{
+  "id": "002",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_korean/korean2.txt",
+  "original_english_file": "sample_instagram_english/english2.txt",
+  "post_type": "notice",
+  "topic": "student_council",
+  "split": "optimization",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": false,
+  "has_urls": true,
+  "hashtags": [],
+  "mentions": [],
+  "urls": [
+    "https://watcha.com/payment/coupon/bridge"
+  ],
+  "dates": [
+    "2월 28일"
+  ],
+  "times": [],
+  "numbers": [
+    "36",
+    "2026",
+    "2",
+    "28",
+    "12",
+    "900",
+    "15",
+    "10",
+    "965",
+    "6",
+    "1",
+    "6"
+  ],
+  "char_count_ko": 674,
+  "char_count_en": 1181,
+  "line_count_ko": 15,
+  "line_count_en": 10,
+  "manual_review_required": false,
+  "notes": ""
+}

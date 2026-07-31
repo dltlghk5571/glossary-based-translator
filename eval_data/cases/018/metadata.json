@@ -1,0 +1,41 @@
+{
+  "id": "018",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_english/english18.txt",
+  "original_english_file": "sample_instagram_korean/korean18.txt",
+  "post_type": "event",
+  "topic": "event",
+  "split": "holdout",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": true,
+  "has_urls": false,
+  "hashtags": [],
+  "mentions": [
+    "@kaist_kamf"
+  ],
+  "urls": [],
+  "dates": [],
+  "times": [
+    "오후 1시",
+    "오후 6시"
+  ],
+  "numbers": [
+    "2025",
+    "2025",
+    "2025",
+    "5",
+    "6",
+    "1",
+    "6",
+    "9",
+    "3"
+  ],
+  "char_count_ko": 322,
+  "char_count_en": 622,
+  "line_count_ko": 17,
+  "line_count_en": 19,
+  "manual_review_required": true,
+  "notes": "Source folders were swapped for this pair: the Korean text was found in the sample_instagram_english folder and vice versa. Auto-corrected by language detection; please confirm."
+}

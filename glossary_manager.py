@@ -163,6 +163,8 @@ def match_terms(text, glossary_rows):
         en_term = row.get("en_term", "").strip()
         if not ko_term or not en_term:
             continue
+        if row.get("status", "approved").strip() != "approved":
+            continue
         if ko_term not in surface_map:
             surface_map[ko_term] = (ko_term, en_term, "ko_term")
         for alias in split_aliases(row.get("aliases", "")):

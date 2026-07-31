@@ -1,9 +1,30 @@
 import re
 
+import eval_metrics
 from glossary_manager import match_terms, split_aliases
 from prompts import build_repair_prompt
 
 PLACEHOLDER_RE = re.compile(r"__TERM_\d+__")
+
+_FORMAT_WARNING_LABELS = {
+    "dates_preserved": "date(s)",
+    "times_preserved": "time(s)",
+    "numbers_preserved": "number(s)",
+    "links_preserved": "URL(s)",
+    "mentions_preserved": "@mention(s)",
+    "hashtags_preserved": "#hashtag(s)",
+}
+
+
+def _format_warnings(raw_text, final_translation):
+    """Non-blocking warnings (not violations) for dropped dates/times/numbers/
+    URLs/mentions/hashtags -- reuses the same rule-based checks the evaluation
+    pipeline scores against, so production and eval stay consistent."""
+    checks = eval_metrics.format_checks(raw_text, final_translation)
+    return [
+        f"Possible {_FORMAT_WARNING_LABELS[key]} not preserved in translation."
+        for key, ok in checks.items() if not ok
+    ]
 
 
 def audit_translation(raw_text, glossary_rows, placeholder_map, translation_draft, final_translation):
@@ -80,6 +101,7 @@ def audit_translation(raw_text, glossary_rows, placeholder_map, translation_draf
     return {
         "has_violation": len(violations) > 0,
         "violations": violations,
+        "format_warnings": _format_warnings(raw_text, final_translation),
     }
 
 

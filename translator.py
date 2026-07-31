@@ -5,6 +5,10 @@ import google.generativeai as genai
 import csv
 import time
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 class GlossaryMatcher:
     def __init__(self, glossary_path='glossary.csv'):
         self.glossary_path = glossary_path
@@ -239,11 +243,6 @@ def _build_arg_parser():
     return parser
 
 
-def _make_model(api_key):
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-2.0-flash")
-
-
 def main():
     parser = _build_arg_parser()
     args = parser.parse_args()
@@ -254,9 +253,9 @@ def main():
 
     import json
     import translation_graph
+    import llm_providers
 
-    api_key = _require_api_key()
-    model = _make_model(api_key)
+    generate_fns = llm_providers.build_generate_fns()
 
     if not os.path.exists(args.input):
         print(f"'{args.input}' not found.")
@@ -270,7 +269,7 @@ def main():
         return
 
     if args.dry_run:
-        nodes = translation_graph.make_nodes(model)
+        nodes = translation_graph.make_nodes(generate_fns)
         state = {"raw_text": raw_text, "glossary_path": args.glossary}
         state.update(nodes["load_glossary"](state))
         state.update(nodes["migrate_glossary_if_needed"](state))
@@ -290,7 +289,7 @@ def main():
         return
 
     result = translation_graph.run_pipeline(
-        raw_text, args.glossary, model, interactive=args.interactive
+        raw_text, args.glossary, generate_fns, interactive=args.interactive
     )
 
     final_translation = result.get("final_translation", "")

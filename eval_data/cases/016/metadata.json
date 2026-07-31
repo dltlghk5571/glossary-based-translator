@@ -1,0 +1,31 @@
+{
+  "id": "016",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_korean/korean16.txt",
+  "original_english_file": "sample_instagram_english/english16.txt",
+  "post_type": "report",
+  "topic": "student_council",
+  "split": "holdout",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": false,
+  "has_urls": false,
+  "hashtags": [],
+  "mentions": [],
+  "urls": [],
+  "dates": [],
+  "times": [],
+  "numbers": [
+    "7",
+    "7",
+    "2",
+    "5"
+  ],
+  "char_count_ko": 306,
+  "char_count_en": 655,
+  "line_count_ko": 14,
+  "line_count_en": 16,
+  "manual_review_required": false,
+  "notes": ""
+}

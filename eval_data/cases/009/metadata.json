@@ -1,0 +1,41 @@
+{
+  "id": "009",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_korean/korean9.txt",
+  "original_english_file": "sample_instagram_english/english9.txt",
+  "post_type": "guide",
+  "topic": "student_council",
+  "split": "optimization",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": true,
+  "has_urls": false,
+  "hashtags": [],
+  "mentions": [
+    "@student.kaist.ac.kr",
+    "@student.kaist.ac.kr"
+  ],
+  "urls": [],
+  "dates": [
+    "11/3",
+    "11/16"
+  ],
+  "times": [],
+  "numbers": [
+    "36",
+    "11",
+    "3",
+    "11",
+    "16",
+    "9",
+    "2",
+    "36"
+  ],
+  "char_count_ko": 807,
+  "char_count_en": 1753,
+  "line_count_ko": 20,
+  "line_count_en": 20,
+  "manual_review_required": false,
+  "notes": ""
+}

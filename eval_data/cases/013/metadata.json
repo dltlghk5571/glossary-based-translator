@@ -1,0 +1,41 @@
+{
+  "id": "013",
+  "source_ko": "kaistua_grit",
+  "source_en": "kaistua_global",
+  "original_korean_file": "sample_instagram_korean/korean13.txt",
+  "original_english_file": "sample_instagram_english/english13.txt",
+  "post_type": "event",
+  "topic": "event",
+  "split": "optimization",
+  "language_pair": "ko-en",
+  "has_hashtags": false,
+  "has_mentions": false,
+  "has_urls": true,
+  "hashtags": [],
+  "mentions": [],
+  "urls": [
+    "https://battle.nypc.co.kr/ko"
+  ],
+  "dates": [
+    "9/29"
+  ],
+  "times": [
+    "오후 1시",
+    "4시"
+  ],
+  "numbers": [
+    "3",
+    "9",
+    "29",
+    "1",
+    "4",
+    "500",
+    "100"
+  ],
+  "char_count_ko": 407,
+  "char_count_en": 835,
+  "line_count_ko": 31,
+  "line_count_en": 22,
+  "manual_review_required": false,
+  "notes": ""
+}
