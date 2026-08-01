@@ -46,3 +46,6 @@ glossary.csv.bak
 
 # Local tooling
 .claude/
+
+# Graphify generated outputs
+graphify-out/

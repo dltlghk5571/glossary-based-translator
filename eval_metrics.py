@@ -28,7 +28,7 @@ _DATE_MONTH_ONLY_RE = re.compile(r"(\d{1,2})월(?!\s?\d{1,2}일)")
 # week", "1인당" -> "per person"). Numbers with these suffixes are excluded
 # from strict numbers_preserved -- treating a stylistic word-form conversion
 # as data loss would be a false positive.
-_COUNTER_SUFFIXES = ("회", "번째", "주차", "차례", "인당")
+_COUNTER_SUFFIXES = ("회", "번째", "주차", "차례", "인당", "학기")
 
 # Comma-grouped numbers ("12,900") must be matched as one token, not split
 # into "12" and "900" by a plain \d+ scan.

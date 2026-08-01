@@ -1,7 +1,6 @@
 import os
 import argparse
 import pandas as pd
-import google.generativeai as genai
 import csv
 import time
 
@@ -51,6 +50,7 @@ class GlossaryMatcher:
 
 class TranslationSystem:
     def __init__(self, api_key):
+        import google.generativeai as genai
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         self.matcher = GlossaryMatcher()

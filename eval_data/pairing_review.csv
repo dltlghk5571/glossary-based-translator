@@ -1,0 +1,21 @@
+case_id,korean_source,english_source,detected_title_ko,detected_title_en,confidence,manual_review_required,notes
+001,sample_instagram_korean/korean1.txt,sample_instagram_english/english1.txt,[기말고사 기간 교내 카페 연장 운영 안내],[Extended Operation of On-Campus Cafes during the Finals Period],high,False,
+002,sample_instagram_korean/korean2.txt,sample_instagram_english/english2.txt,[왓챠(WATCHA) 신규 제휴 안내],[New Partnership with WATCHA],high,False,
+003,sample_instagram_korean/korean3.txt,sample_instagram_english/english3.txt,[2025 총 MT 안내 및 참여인원 모집],[2025 Total MT with the 36th Student Council <SPACE>],high,False,
+004,sample_instagram_korean/korean4.txt,sample_instagram_english/english4.txt,[학생문화제 투표 독려 부스 운영 안내],[Student Culture Festival Vote Encouragement Booth],high,False,
+005,sample_instagram_korean/korean5.txt,sample_instagram_english/english5.txt,[KAIST 학부 총학생회 X 55도와인포차][Notice on Partnership with 55°F wine bar],[KAIST Undergraduate Association X 55°F Wine Bar] [Notice on Partnership with 55°F Wine Bar],high,True,post_type/topic assigned with low confidence.
+006,sample_instagram_korean/korean6.txt,sample_instagram_english/english6.txt,[KAIST 학부 총학생회 X 커피 볶는 집][Notice on Partnership with I AM COFFEE],[KAIST Undergraduate Association X I AM COFFEE] [Notice on Partnership with I AM COFFEE],high,True,post_type/topic assigned with low confidence.
+007,sample_instagram_korean/korean7.txt,sample_instagram_english/english7.txt,[KAIST 학부 총학생회 X 페페스 파스타][Notice on Partnership with Pepe’s pasta],[KAIST Undergraduate Association X Pepes pasta] [Notice on Partnership with Pepes pasta],high,True,post_type/topic assigned with low confidence.
+008,sample_instagram_korean/korean8.txt,sample_instagram_english/english8.txt,[신규 무인 복합기 위치 및 설치 배경 안내],[Notice on Locations of New Self-Printing Services],high,False,
+009,sample_instagram_korean/korean9.txt,sample_instagram_english/english9.txt,[창의학습관 강의실 시간표 및 콘센트 보수 설비 설문조사],[E11 Course Schedule and Survey on Power Outlet Maintenance in Lecture Rooms],high,False,
+010,sample_instagram_korean/korean10.txt,sample_instagram_english/english10.txt,[중간고사 간식 이벤트 안내],[Midterm Snack Event Notice],high,False,
+011,sample_instagram_korean/korean11.txt,sample_instagram_english/english11.txt,[카이라운지 개편 및 변동 사항 안내],[Notice on the Renewal and Changes of the KAI-Lounge],high,False,
+012,sample_instagram_korean/korean12.txt,sample_instagram_english/english12.txt,[생활관 휴게실 개선 안내],[Information on the Improvement of the Dormitory Lounge],high,False,
+013,sample_instagram_korean/korean13.txt,sample_instagram_english/english13.txt,[NYPC 코드배틀 핑크빈 간식차 안내],[Food Truck Announcement],high,False,
+014,sample_instagram_korean/korean14.txt,sample_instagram_english/english14.txt,[대전역/대전복합 셔틀버스 운행 연장 안내],[Shuttle Bus to Daejeon Station & Daejeon Terminal],high,False,
+015,sample_instagram_korean/korean15.txt,sample_instagram_english/english15.txt,[OLEV 시간표 변경 및 정류장 신설 안내],[Notice of OLEV Timetable Change and Addition of Bus Stops],high,False,
+016,sample_instagram_korean/korean16.txt,sample_instagram_english/english16.txt,[학부 총학생회 활동일지],[What SPACE did besides work],high,False,
+017,sample_instagram_korean/korean17.txt,sample_instagram_english/english17.txt,[2025 KAMF 후원 업체 소개],[2025 KAMF Sponsors Info],high,False,
+018,sample_instagram_english/english18.txt,sample_instagram_korean/korean18.txt,[2025 KAMF 후원 업체 소개],[2025 KAMF Sponsors Info],corrected,True,Source folders were swapped for this pair: the Korean text was found in the sample_instagram_english folder and vice versa. Auto-corrected by language detection; please confirm.
+019,sample_instagram_korean/korean19.txt,sample_instagram_english/english19.txt,[2025 KAMF 후원 업체 소개],[2025 KAMF Sponsors Info],high,False,
+020,sample_instagram_korean/korean20.txt,sample_instagram_english/english20.txt,[2025 KAMF 후원 업체 소개],[2025 KAMF Sponsors Info],high,True,post_type/topic assigned with low confidence.

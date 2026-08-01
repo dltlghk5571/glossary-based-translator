@@ -1,4 +1,3 @@
-import re
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -25,7 +24,9 @@ class TranslationState(TypedDict, total=False):
 
     user_term_decisions: list
     glossary_conflicts: list
-    raw_user_response: str  # internal: unparsed multi-line answer
+    pending_terms: list  # internal: high-priority terms still awaiting an answer
+    current_term: dict  # internal: term the last interrupt() asked about
+    raw_user_response: str  # internal: the single-line answer for current_term
 
     protected_text: str
     placeholder_map: dict
@@ -38,76 +39,18 @@ class TranslationState(TypedDict, total=False):
     repair_count: int
 
 
-def build_user_message(high_priority_terms):
-    lines = [
-        "다음 용어들은 학생사회에서 고정 번역이 필요할 가능성이 높지만 glossary에 없습니다.",
-        "각 용어의 공식 영어 번역을 입력해주세요.",
+def build_user_message(term):
+    """One term at a time: the ko_term is already known, so we only need the
+    English translation back -- no 'ko = en' parsing, no multi-line input."""
+    suggested = term.get("suggested_translation", "")
+    return "\n".join([
+        f"'{term['ko_term']}'은(는) glossary에 없는 용어입니다.",
+        f"- 유형: {term.get('type', 'General')}",
+        f"- 등장 문맥: \"{term.get('context_sentence', '')}\"",
+        f"- LLM 제안: {suggested}",
         "",
-    ]
-    for i, term in enumerate(high_priority_terms, 1):
-        suggested = term.get("suggested_translation", "")
-        lines.append(f"{i}. {term['ko_term']}")
-        lines.append(f"- 유형: {term.get('type', 'General')}")
-        lines.append(f"- 등장 문맥: \"{term.get('context_sentence', '')}\"")
-        lines.append(f"- LLM 제안: {suggested}")
-        lines.append(f"- 필요한 입력 예시: {term['ko_term']} = {suggested}")
-        lines.append("")
-    lines.append("입력 형식:")
-    for term in high_priority_terms:
-        lines.append(f"{term['ko_term']} = {term.get('suggested_translation', '')}")
-    return "\n".join(lines)
-
-
-_ANSWER_LINE_RE = re.compile(r"^(.+?)\s*(?:->|=|:)\s*(.+)$")
-
-
-def parse_user_response(raw_text):
-    """Parse the user's multi-line answer into
-    [{"ko_term", "en_term", "aliases", "skipped"}]. Supports 'ko = en',
-    'ko: en', 'ko -> en', and an optional trailing '| aliases: a, b'.
-    """
-    decisions = []
-    for line in raw_text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-
-        main_part = line
-        aliases = ""
-        if "|" in line:
-            main_part, alias_part = line.split("|", 1)
-            alias_match = re.search(r"aliases\s*:\s*(.+)", alias_part, re.IGNORECASE)
-            if alias_match:
-                aliases = alias_match.group(1).strip()
-
-        m = _ANSWER_LINE_RE.match(main_part.strip())
-        if not m:
-            continue
-
-        ko_term = m.group(1).strip()
-        en_term = m.group(2).strip()
-        skipped = (not en_term) or en_term.lower() == "skip"
-        decisions.append({
-            "ko_term": ko_term,
-            "en_term": "" if skipped else en_term,
-            "aliases": aliases,
-            "skipped": skipped,
-        })
-    return decisions
-
-
-def _read_multiline_input():
-    print("(입력을 마치려면 빈 줄을 입력하세요)")
-    lines = []
-    while True:
-        try:
-            line = input()
-        except EOFError:
-            break
-        if line.strip() == "":
-            break
-        lines.append(line)
-    return "\n".join(lines)
+        "영어 번역만 입력하세요 (건너뛰려면 skip 입력):",
+    ])
 
 
 def make_nodes(generate_fns):
@@ -161,51 +104,42 @@ def make_nodes(generate_fns):
         return {"missing_terms": missing}
 
     def request_user_translations(state):
-        missing = state.get("missing_terms", [])
-        high_priority = [t for t in missing if t.get("priority") == "high"]
+        pending = state.get("pending_terms")
+        if pending is None:
+            pending = [t for t in state.get("missing_terms", []) if t.get("priority") == "high"]
+
         warnings = list(state.get("warnings", []))
 
         if not state.get("interactive", True):
-            for t in high_priority:
+            for t in pending:
                 warnings.append(
                     f"[no-interactive] High-priority missing term left untranslated: {t['ko_term']}"
                 )
-            return {"raw_user_response": "", "warnings": warnings}
+            return {"pending_terms": [], "warnings": warnings}
 
-        if not high_priority:
-            return {"raw_user_response": ""}
+        if not pending:
+            return {"pending_terms": []}
 
-        message = build_user_message(high_priority)
-        user_response = interrupt(message)
-        return {"raw_user_response": user_response}
+        current = pending[0]
+        user_response = interrupt(build_user_message(current))
+        return {"pending_terms": pending, "current_term": current, "raw_user_response": user_response}
 
     def parse_user_translations(state):
-        raw = state.get("raw_user_response", "")
-        parsed = parse_user_response(raw) if raw else []
+        current = state.get("current_term")
+        if current is None:
+            return {}
+
+        answer = (state.get("raw_user_response") or "").strip()
         warnings = list(state.get("warnings", []))
-        missing_by_ko = {t["ko_term"]: t for t in state.get("missing_terms", [])}
+        decisions = list(state.get("user_term_decisions", []))
 
-        decisions = []
-        answered_ko = set()
-        for item in parsed:
-            answered_ko.add(item["ko_term"])
-            if item["skipped"]:
-                term = missing_by_ko.get(item["ko_term"])
-                if term and term.get("priority") == "high":
-                    warnings.append(f"High-priority term skipped by user: {item['ko_term']}")
-                continue
-            decisions.append({
-                "ko_term": item["ko_term"],
-                "en_term": item["en_term"],
-                "aliases": item["aliases"],
-            })
+        if answer and answer.lower() != "skip":
+            decisions.append({"ko_term": current["ko_term"], "en_term": answer, "aliases": ""})
+        else:
+            warnings.append(f"High-priority term left unanswered: {current['ko_term']}")
 
-        if state.get("interactive", True):
-            for t in missing_by_ko.values():
-                if t.get("priority") == "high" and t["ko_term"] not in answered_ko:
-                    warnings.append(f"High-priority term left unanswered: {t['ko_term']}")
-
-        return {"user_term_decisions": decisions, "warnings": warnings}
+        remaining = [t for t in state.get("pending_terms", []) if t["ko_term"] != current["ko_term"]]
+        return {"user_term_decisions": decisions, "warnings": warnings, "pending_terms": remaining}
 
     def update_glossary(state):
         updated, conflicts = gm.append_user_terms(
@@ -312,6 +246,10 @@ def _audit_branch(state):
     return "finalize_output"
 
 
+def _term_answer_branch(state):
+    return "request_user_translations" if state.get("pending_terms") else "update_glossary"
+
+
 def build_graph(generate_fns=None):
     nodes = make_nodes(generate_fns)
     graph = StateGraph(TranslationState)
@@ -333,7 +271,14 @@ def build_graph(generate_fns=None):
         },
     )
     graph.add_edge("request_user_translations", "parse_user_translations")
-    graph.add_edge("parse_user_translations", "update_glossary")
+    graph.add_conditional_edges(
+        "parse_user_translations",
+        _term_answer_branch,
+        {
+            "request_user_translations": "request_user_translations",
+            "update_glossary": "update_glossary",
+        },
+    )
     graph.add_edge("update_glossary", "protect_glossary_terms")
 
     graph.add_edge("protect_glossary_terms", "translate_text")
@@ -385,8 +330,11 @@ def run_pipeline(raw_text, glossary_path, generate_fns, interactive=True, thread
 
     result = app.invoke(initial_state, config=config)
     while "__interrupt__" in result:
-        print("\n" + result["__interrupt__"][0].value + "\n")
-        user_text = _read_multiline_input()
+        print("\n" + result["__interrupt__"][0].value)
+        try:
+            user_text = input("> ")
+        except EOFError:
+            user_text = ""
         result = app.invoke(Command(resume=user_text), config=config)
 
     return result

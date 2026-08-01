@@ -114,29 +114,46 @@ class MissingTermDetectionTests(unittest.TestCase):
         self.assertEqual(missing_ko_terms, {"비상대책위원회", "선거시행세칙"})
 
 
-class ParseUserResponseTests(unittest.TestCase):
-    def test_equals_separator_with_aliases(self):
-        raw = "비상대책위원회 = Emergency Committee | aliases: 비대위"
-        decisions = tg.parse_user_response(raw)
-        self.assertEqual(decisions, [{
-            "ko_term": "비상대책위원회", "en_term": "Emergency Committee",
-            "aliases": "비대위", "skipped": False,
+class ParseUserTranslationsTests(unittest.TestCase):
+    """One term is asked (and answered) per interrupt() round-trip."""
+
+    def test_answer_is_recorded_for_current_term(self):
+        nodes = tg.make_nodes(None)
+        state = {
+            "current_term": {"ko_term": "비상대책위원회", "priority": "high"},
+            "raw_user_response": "Emergency Committee",
+            "pending_terms": [{"ko_term": "비상대책위원회", "priority": "high"}],
+        }
+        result = nodes["parse_user_translations"](state)
+        self.assertEqual(result["user_term_decisions"], [{
+            "ko_term": "비상대책위원회", "en_term": "Emergency Committee", "aliases": "",
         }])
+        self.assertEqual(result["pending_terms"], [])
 
-    def test_colon_and_arrow_separators(self):
-        raw = "선거시행세칙: Election Implementation Rules\n총학생회 -> Undergraduate Student Council"
-        decisions = tg.parse_user_response(raw)
-        self.assertEqual(len(decisions), 2)
-        self.assertEqual(decisions[0]["ko_term"], "선거시행세칙")
-        self.assertEqual(decisions[0]["en_term"], "Election Implementation Rules")
-        self.assertEqual(decisions[1]["ko_term"], "총학생회")
-        self.assertEqual(decisions[1]["en_term"], "Undergraduate Student Council")
+    def test_skip_keyword_leaves_term_unanswered(self):
+        nodes = tg.make_nodes(None)
+        state = {
+            "current_term": {"ko_term": "선거시행세칙", "priority": "high"},
+            "raw_user_response": "skip",
+            "pending_terms": [{"ko_term": "선거시행세칙", "priority": "high"}],
+        }
+        result = nodes["parse_user_translations"](state)
+        self.assertEqual(result["user_term_decisions"], [])
+        self.assertIn("선거시행세칙", result["warnings"][0])
 
-    def test_skip_keyword(self):
-        raw = "선거시행세칙 = skip"
-        decisions = tg.parse_user_response(raw)
-        self.assertTrue(decisions[0]["skipped"])
-        self.assertEqual(decisions[0]["en_term"], "")
+    def test_next_pending_term_is_asked_after_current_is_removed(self):
+        nodes = tg.make_nodes(None)
+        state = {
+            "current_term": {"ko_term": "선거시행세칙", "priority": "high"},
+            "raw_user_response": "Election Implementation Rules",
+            "pending_terms": [
+                {"ko_term": "선거시행세칙", "priority": "high"},
+                {"ko_term": "총학생회", "priority": "high"},
+            ],
+        }
+        result = nodes["parse_user_translations"](state)
+        self.assertEqual(result["pending_terms"], [{"ko_term": "총학생회", "priority": "high"}])
+        self.assertEqual(tg._term_answer_branch(result), "request_user_translations")
 
 
 class GlossaryAppendTests(unittest.TestCase):
