@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUserFromRequest } from "@/lib/auth";
+import { canEditGlossary, getSessionUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs"; // Prisma's pg driver adapter needs Node, not edge
 export const dynamic = "force-dynamic"; // session-cookie-dependent response -- never let Vercel/Next cache this across users
 
 export async function POST(request: NextRequest) {
-  if (!(await getSessionUserFromRequest(request))) {
+  if (!canEditGlossary(await getSessionUserFromRequest(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

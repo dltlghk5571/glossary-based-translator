@@ -58,6 +58,11 @@ function verifiedUserId(cookieValue: string | undefined): number | null {
 
 export type SessionUser = { id: number; username: string; role: string };
 
+// "editor" can manage glossary content (create/edit/delete terms) but not user accounts.
+export function canEditGlossary(user: SessionUser | null): boolean {
+  return !!user && (user.role === "admin" || user.role === "editor");
+}
+
 export async function getSessionUser(cookieValue: string | undefined): Promise<SessionUser | null> {
   const userId = verifiedUserId(cookieValue);
   if (userId === null) return null;

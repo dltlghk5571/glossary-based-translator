@@ -65,3 +65,7 @@ export function updateGlossaryTerm(id: number, fields: Partial<GlossaryTerm>) {
     body: JSON.stringify(fields),
   });
 }
+
+export function deleteGlossaryTerm(id: number) {
+  return request<{ ok: true }>(`/api/glossary/${id}`, { method: "DELETE" });
+}

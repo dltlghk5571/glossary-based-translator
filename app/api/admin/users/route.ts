@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   if (!username) {
     return NextResponse.json({ ok: false, error: "username is required" }, { status: 400 });
   }
-  const role = body.role === "admin" ? "admin" : "user";
+  const role = ["admin", "editor"].includes(body.role) ? body.role : "user";
   const password = (body.password || "").trim() || generatePassword();
 
   const existing = await prisma.user.findUnique({ where: { username } });

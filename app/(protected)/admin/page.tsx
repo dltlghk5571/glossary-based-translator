@@ -16,7 +16,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [newUsername, setNewUsername] = useState("");
-  const [newRole, setNewRole] = useState<"user" | "admin">("user");
+  const [newRole, setNewRole] = useState<"user" | "editor" | "admin">("user");
   const [issuedCredential, setIssuedCredential] = useState<{ username: string; password: string } | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -102,8 +102,9 @@ export default function AdminPage() {
             </label>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Role</span>
-              <select value={newRole} onChange={(e) => setNewRole(e.target.value as "user" | "admin")}>
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value as "user" | "editor" | "admin")}>
                 <option value="user">user</option>
+                <option value="editor">editor</option>
                 <option value="admin">admin</option>
               </select>
             </label>
