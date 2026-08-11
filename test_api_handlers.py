@@ -1,7 +1,7 @@
-"""Direct tests for the Vercel Python function handlers (api/analyze.py,
-api/translate.py, api/_utils.py) -- spins each handler up on a real local
-socket via http.server so do_POST's request-parsing/auth/response-writing
-runs exactly as it would in production, without needing `vercel dev`.
+"""Direct tests for the Vercel Python function handler (api/index.py,
+api/_utils.py) -- spins the handler up on a real local socket via
+http.server so do_POST's routing/auth/response-writing runs exactly as it
+would in production, without needing `vercel dev`.
 """
 import http.client
 import http.server
@@ -15,8 +15,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "api"))
 
-import analyze as analyze_module  # noqa: E402
-import translate as translate_module  # noqa: E402
+import index as index_module  # noqa: E402
 import _utils  # noqa: E402
 
 # BaseHTTPRequestHandler's default access-log line does a reverse DNS lookup
@@ -26,10 +25,8 @@ http.server.BaseHTTPRequestHandler.address_string = lambda self: self.client_add
 
 
 class _HandlerServerTestCase(unittest.TestCase):
-    handler_module = None
-
     def setUp(self):
-        self.server = HTTPServer(("127.0.0.1", 0), self.handler_module.handler)
+        self.server = HTTPServer(("127.0.0.1", 0), index_module.handler)
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -54,10 +51,9 @@ class _HandlerServerTestCase(unittest.TestCase):
             conn.close()
 
 
-class AnalyzeHandlerTests(_HandlerServerTestCase):
-    handler_module = analyze_module
-
-    @patch("analyze.web_pipeline.analyze_text")
+class AnalyzeRouteTests(_HandlerServerTestCase):
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("index.web_pipeline.analyze_text")
     def test_returns_analyze_result(self, mock_analyze):
         mock_analyze.return_value = {
             "candidate_terms": [], "matched_terms": [], "missing_terms": [], "warnings": [],
@@ -67,12 +63,14 @@ class AnalyzeHandlerTests(_HandlerServerTestCase):
         self.assertEqual(data["missing_terms"], [])
         mock_analyze.assert_called_once_with("안녕하세요")
 
+    @patch.dict(os.environ, {}, clear=True)
     def test_rejects_empty_text(self):
         status, data = self.post("/api/analyze", {"text": "  "})
         self.assertEqual(status, 400)
         self.assertIn("error", data)
 
-    @patch("analyze.web_pipeline.analyze_text")
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("index.web_pipeline.analyze_text")
     def test_pipeline_exception_becomes_500(self, mock_analyze):
         mock_analyze.side_effect = RuntimeError("boom")
         status, data = self.post("/api/analyze", {"text": "안녕하세요"})
@@ -86,10 +84,9 @@ class AnalyzeHandlerTests(_HandlerServerTestCase):
         self.assertEqual(data["error"], "unauthorized")
 
 
-class TranslateHandlerTests(_HandlerServerTestCase):
-    handler_module = translate_module
-
-    @patch("translate.web_pipeline.translate_text")
+class TranslateRouteTests(_HandlerServerTestCase):
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("index.web_pipeline.translate_text")
     def test_returns_translate_result(self, mock_translate):
         mock_translate.return_value = {
             "translation": "Hello", "audit_report": {"has_violation": False, "violations": [], "format_warnings": []},
@@ -100,9 +97,16 @@ class TranslateHandlerTests(_HandlerServerTestCase):
         self.assertEqual(data["translation"], "Hello")
         mock_translate.assert_called_once_with("안녕하세요")
 
+    @patch.dict(os.environ, {}, clear=True)
     def test_rejects_empty_text(self):
         status, data = self.post("/api/translate", {"text": ""})
         self.assertEqual(status, 400)
+
+
+class UnknownRouteTests(_HandlerServerTestCase):
+    def test_unknown_path_is_404(self):
+        status, data = self.post("/api/nope", {"text": "x"})
+        self.assertEqual(status, 404)
 
 
 class IsAuthorizedTests(unittest.TestCase):

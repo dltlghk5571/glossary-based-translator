@@ -7,9 +7,22 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from _utils import is_authorized, read_json_body, send_json, send_unauthorized, send_error  # noqa: E402
 import web_pipeline  # noqa: E402
 
+# Vercel's Python entrypoint detection gets ambiguous with multiple
+# non-canonically-named api/*.py handler files (api/analyze.py, api/translate.py
+# each defining their own `handler`) -- it falls back to single-app detection
+# and refuses to pick one. A single canonically-named file (api/index.py) with
+# one handler dispatching on self.path is the documented, unambiguous pattern.
+ROUTES = {
+    "/api/analyze": lambda text: web_pipeline.analyze_text(text),
+    "/api/translate": lambda text: web_pipeline.translate_text(text),
+}
+
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        route = ROUTES.get(self.path)
+        if route is None:
+            return send_error(self, 404, "not found")
         if not is_authorized(self):
             return send_unauthorized(self)
         try:
@@ -17,7 +30,7 @@ class handler(BaseHTTPRequestHandler):
             text = (body.get("text") or "").strip()
             if not text:
                 return send_error(self, 400, "text is required")
-            result = web_pipeline.translate_text(text)
+            result = route(text)
             send_json(self, 200, result)
         except Exception as e:
             send_error(self, 500, str(e))

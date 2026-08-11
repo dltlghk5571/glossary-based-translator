@@ -168,14 +168,21 @@ persistence paths that share one Postgres (Neon) database and one schema source 
 - **Glossary CRUD** (`app/api/glossary/**`) is plain Next.js Route Handlers using Prisma
   Client (`lib/prisma.ts`) against the `Glossary` table. This replaced an earlier
   Python/psycopg version of these same endpoints.
-- **Analyze/translate** (`api/analyze.py`, `api/translate.py`, Vercel Python Functions) reuse
-  the CLI's pipeline modules (`glossary_manager.py`, `term_extractor.py`, `audit.py`,
-  `llm_providers.py`) through `web_pipeline.py`, which replaces the CLI's `interrupt()`-driven
-  human-in-the-loop with explicit `analyze → approve → translate` steps. They read the same
-  `Glossary` table read-only via raw SQL (`db_glossary.py`) instead of `glossary.csv`, since
-  Vercel's filesystem is read-only at runtime and Prisma Client is TypeScript-only (no Python
-  binding) -- so the Python side reads the Prisma-managed table directly rather than duplicating
-  the schema.
+- **Analyze/translate** (`api/index.py`, one Vercel Python Function routing `/api/analyze` and
+  `/api/translate` by path) reuse the CLI's pipeline modules (`glossary_manager.py`,
+  `term_extractor.py`, `audit.py`, `llm_providers.py`) through `web_pipeline.py`, which replaces
+  the CLI's `interrupt()`-driven human-in-the-loop with explicit `analyze → approve → translate`
+  steps. They read the same `Glossary` table read-only via raw SQL (`db_glossary.py`) instead of
+  `glossary.csv`, since Vercel's filesystem is read-only at runtime and Prisma Client is
+  TypeScript-only (no Python binding) -- so the Python side reads the Prisma-managed table
+  directly rather than duplicating the schema.
+
+  Both routes are merged into a single `api/index.py` file rather than separate
+  `api/analyze.py`/`api/translate.py` files: Vercel's Python entrypoint detection only reliably
+  recognizes one canonically-named file (`index.py`/`app.py`/`server.py`/`main.py`) per project --
+  multiple non-canonical `api/*.py` files each defining their own `handler` hit an ambiguous
+  "no python entrypoint found" build error in production. `api/index.py` dispatches on
+  `self.path` internally instead.
 
 The CLI (`translator.py`) is unaffected and keeps using `glossary.csv` directly.
 
@@ -197,7 +204,7 @@ CLI version's local Python+Next.js middleware emulation has been unreliable in t
 502s from `vercel dev` unrelated to application code — confirmed by the same routes returning
 200 under plain `next dev`). If `vercel dev` 502s for you, don't chase it locally: verify
 `/api/analyze` and `/api/translate` via the Python test suite (`test_api_handlers.py` exercises
-the actual handler classes over a real local HTTP connection, mocking only the LLM/DB calls) and
+the actual handler class over a real local HTTP connection, mocking only the LLM/DB calls) and
 do the final end-to-end check on a Vercel Preview or Production deployment, where the build
 pipeline differs from `vercel dev`'s local emulation.
 
