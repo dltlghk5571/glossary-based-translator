@@ -3,6 +3,7 @@ import { getSessionUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs"; // Prisma's pg driver adapter needs Node, not edge
+export const dynamic = "force-dynamic"; // session-cookie-dependent response -- never let Vercel/Next cache this across users
 
 const COLUMNS = [
   "korean",

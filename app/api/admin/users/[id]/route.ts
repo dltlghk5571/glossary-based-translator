@@ -3,6 +3,7 @@ import { generatePassword, getSessionUserFromRequest, hashPassword } from "@/lib
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic"; // session-cookie-dependent response -- never let Vercel/Next cache this across users
 
 async function requireAdmin(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
