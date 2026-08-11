@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/analyze", "destination": "/api/index" },
+    { "source": "/api/translate", "destination": "/api/index" }
+  ]
+}
