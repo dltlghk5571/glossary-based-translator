@@ -8,6 +8,8 @@ its own imports (it's loaded via importlib in production, not run as a
 script, so its own directory isn't auto-added to sys.path the way a
 locally-run script's would be). Adding it here would mask that class of bug.
 """
+import hashlib
+import hmac
 import http.client
 import http.server
 import importlib.util
@@ -29,6 +31,13 @@ _spec.loader.exec_module(index_module)
 # (socket.getfqdn()) per request, which is slow/flaky in a sandboxed test
 # environment. Skip it here only -- production handler classes are untouched.
 http.server.BaseHTTPRequestHandler.address_string = lambda self: self.client_address[0]
+
+TEST_SECRET = "test-session-secret"
+
+
+def session_cookie(user_id, secret=TEST_SECRET):
+    sig = hmac.new(secret.encode(), str(user_id).encode(), hashlib.sha256).hexdigest()
+    return {"Cookie": f"session={user_id}.{sig}"}
 
 
 class _HandlerServerTestCase(unittest.TestCase):
@@ -59,54 +68,64 @@ class _HandlerServerTestCase(unittest.TestCase):
 
 
 class AnalyzeRouteTests(_HandlerServerTestCase):
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     @patch("index.web_pipeline.analyze_text")
     def test_returns_analyze_result(self, mock_analyze):
         mock_analyze.return_value = {
             "candidate_terms": [], "matched_terms": [], "missing_terms": [], "warnings": [],
         }
-        status, data = self.post("/api/analyze", {"text": "안녕하세요"})
+        status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
         self.assertEqual(status, 200)
         self.assertEqual(data["missing_terms"], [])
         mock_analyze.assert_called_once_with("안녕하세요")
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_rejects_empty_text(self):
-        status, data = self.post("/api/analyze", {"text": "  "})
+        status, data = self.post("/api/analyze", {"text": "  "}, headers=session_cookie(1))
         self.assertEqual(status, 400)
         self.assertIn("error", data)
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     @patch("index.web_pipeline.analyze_text")
     def test_pipeline_exception_becomes_500(self, mock_analyze):
         mock_analyze.side_effect = RuntimeError("boom")
-        status, data = self.post("/api/analyze", {"text": "안녕하세요"})
+        status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
         self.assertEqual(status, 500)
         self.assertEqual(data["error"], "boom")
 
-    @patch.dict(os.environ, {"ADMIN_PASSWORD": "secret"})
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_unauthorized_without_session_cookie(self):
         status, data = self.post("/api/analyze", {"text": "안녕하세요"})
         self.assertEqual(status, 401)
         self.assertEqual(data["error"], "unauthorized")
 
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
+    def test_unauthorized_with_wrong_signature(self):
+        status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers={"Cookie": "session=1.deadbeef"})
+        self.assertEqual(status, 401)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_unauthorized_when_session_secret_unset(self):
+        status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
+        self.assertEqual(status, 401)
+
 
 class TranslateRouteTests(_HandlerServerTestCase):
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     @patch("index.web_pipeline.translate_text")
     def test_returns_translate_result(self, mock_translate):
         mock_translate.return_value = {
             "translation": "Hello", "audit_report": {"has_violation": False, "violations": [], "format_warnings": []},
             "warnings": [],
         }
-        status, data = self.post("/api/translate", {"text": "안녕하세요"})
+        status, data = self.post("/api/translate", {"text": "안녕하세요"}, headers=session_cookie(42))
         self.assertEqual(status, 200)
         self.assertEqual(data["translation"], "Hello")
-        mock_translate.assert_called_once_with("안녕하세요")
+        mock_translate.assert_called_once_with("안녕하세요", user_id=42)
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_rejects_empty_text(self):
-        status, data = self.post("/api/translate", {"text": ""})
+        status, data = self.post("/api/translate", {"text": ""}, headers=session_cookie(1))
         self.assertEqual(status, 400)
 
 
@@ -116,23 +135,27 @@ class UnknownRouteTests(_HandlerServerTestCase):
         self.assertEqual(status, 404)
 
 
-class IsAuthorizedTests(unittest.TestCase):
+class GetSessionUserIdTests(unittest.TestCase):
     class _FakeHandler:
         def __init__(self, cookie=""):
             self.headers = {"Cookie": cookie}
 
     @patch.dict(os.environ, {}, clear=True)
-    def test_no_admin_password_disables_gate(self):
-        self.assertTrue(index_module.is_authorized(self._FakeHandler()))
+    def test_no_secret_is_unauthorized(self):
+        self.assertIsNone(index_module.get_session_user_id(self._FakeHandler("session=1.whatever")))
 
-    @patch.dict(os.environ, {"ADMIN_PASSWORD": "secret"})
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_missing_cookie_is_unauthorized(self):
-        self.assertFalse(index_module.is_authorized(self._FakeHandler()))
+        self.assertIsNone(index_module.get_session_user_id(self._FakeHandler()))
 
-    @patch.dict(os.environ, {"ADMIN_PASSWORD": "secret"})
-    def test_valid_session_cookie_is_authorized(self):
-        token = index_module._session_token()
-        self.assertTrue(index_module.is_authorized(self._FakeHandler(cookie=f"admin_session={token}")))
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
+    def test_valid_cookie_returns_user_id(self):
+        cookie_header = session_cookie(5)["Cookie"]
+        self.assertEqual(index_module.get_session_user_id(self._FakeHandler(cookie_header)), 5)
+
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
+    def test_tampered_signature_is_unauthorized(self):
+        self.assertIsNone(index_module.get_session_user_id(self._FakeHandler("session=1.badsig")))
 
 
 if __name__ == "__main__":

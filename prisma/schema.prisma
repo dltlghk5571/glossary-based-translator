@@ -37,15 +37,40 @@ model Glossary {
   @@index([status])
 }
 
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("user") // "admin" | "user"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  translations Translation[]
+
+  @@index([role])
+}
+
 model Translation {
   id             Int      @id @default(autoincrement())
   sourceText     String
   translatedText String
   status         String   @default("draft")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+
+  // Audit trail for the backoffice: what a translation run produced and cost.
+  warnings     Json? // string[] from the audit report (glossary violations, dropped dates/URLs/etc.)
+  matchedTerms Json? // [{ ko_term, en_term }] glossary terms enforced in this run
+  inputTokens  Int?
+  outputTokens Int?
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   history TranslationHistory[]
+
+  @@index([userId])
 }
 
 model TranslationHistory {

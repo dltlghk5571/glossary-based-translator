@@ -186,6 +186,22 @@ persistence paths that share one Postgres (Neon) database and one schema source 
 
 The CLI (`translator.py`) is unaffected and keeps using `glossary.csv` directly.
 
+**Accounts.** There's no shared password gate anymore -- real per-user accounts (`User` table:
+username, scrypt-hashed password, `role` of `admin`/`user`). Admins manage accounts from `/admin`
+(create/delete/reset password; a freshly issued password is shown exactly once). The session is
+a `${userId}.${hmac}` cookie signed with `SESSION_SECRET` (`lib/auth.ts` on the Next.js side,
+mirrored in `api/index.py` for the Python routes so both can verify it without sharing a session
+store). Bootstrap the first admin account from `ADMIN_PASSWORD` with `npx tsx scripts/seed-admin.ts`
+(idempotent, username `admin`) -- after that, `ADMIN_PASSWORD` isn't read again.
+
+**Translation audit trail.** Every `/api/translate` call writes a `Translation` row: source/output
+text, `warnings`, `matchedTerms` (glossary terms enforced in that run), `inputTokens`/`outputTokens`,
+and the `userId` from the session cookie (`db_translations.py`). Token counts come from each
+provider's usage field (`llm_providers.py`'s `call_anthropic`/`call_openai`/`call_google` now
+return `(text, usage)`; `get_generate_fn`'s public `generate(prompt) -> str` signature is
+unchanged, so the CLI and every other caller are unaffected -- only a caller that passes a
+`usage_tracker` dict to `build_generate_fns()` sees token counts).
+
 ### Local dev
 
 ```bash
@@ -220,18 +236,24 @@ pipeline differs from `vercel dev`'s local emulation.
    - `DATABASE_URL_UNPOOLED` — direct (non-pooled) connection string, used by `prisma.config.ts`
      for the Prisma CLI (`migrate`/`validate`/`studio`) since DDL is unreliable through a
      transaction-mode pooler.
-   - `ADMIN_PASSWORD` — gates `/translate`, `/glossary` behind a login page
-     (`app/(protected)/layout.tsx`); leaving it unset disables the gate (local dev only — always
-     set it in production). This runs as a Node.js Server Component, not `middleware.ts` --
-     Vercel's edge runtime has a platform-level `ReferenceError: __dirname is not defined` bug
-     that broke every `middleware.ts` on this project regardless of its content (reproduced with
-     an empty one importing nothing but `next/server`), so the gate lives in a layout instead.
+   - `SESSION_SECRET` — signs the login session cookie; required in every environment (Python
+     and Node both reject requests if it's unset -- there's no "gate disabled" fallback once
+     real accounts are involved). Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
+   - `ADMIN_PASSWORD` — only used once, by `scripts/seed-admin.ts`, to create the bootstrap
+     `admin` account. Not read at request time.
+
+   The login gate (`app/(protected)/layout.tsx`) runs as a Node.js Server Component, not
+   `middleware.ts` -- Vercel's edge runtime has a platform-level `ReferenceError: __dirname is
+   not defined` bug that broke every `middleware.ts` on this project regardless of its content
+   (reproduced with an empty one importing nothing but `next/server`), so the gate lives in a
+   layout instead.
 3. Build command: `next build` (default). `npm install`'s `postinstall` script runs
    `prisma generate` automatically, so the generated client (`lib/generated/prisma/`, gitignored)
    is always rebuilt from the current schema on each deploy. Local dev command: `vercel dev`.
    Deploy: `vercel --prod` or push to the connected branch.
 4. Run `npx prisma migrate deploy` against the production `DATABASE_URL_UNPOOLED` once before
-   first use, and again after any schema change.
+   first use, and again after any schema change, then `npx tsx scripts/seed-admin.ts` once to
+   create the first admin account.
 
 ## Notes
 

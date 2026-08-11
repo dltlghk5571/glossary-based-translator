@@ -84,76 +84,77 @@ export default function TranslatePage() {
   }
 
   return (
-    <main style={{ maxWidth: 900 }}>
-      <h1>Translate</h1>
-
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="번역할 한국어 원문을 입력하세요"
-        rows={10}
-        style={{ width: "100%", padding: 8, fontFamily: "inherit" }}
-      />
-
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <button onClick={handleTranslateClick} disabled={busy || phase === "reviewing" || !text.trim()}>
-          {phase === "analyzing" ? "Checking glossary terms..." : phase === "translating" ? "Translating..." : "Translate"}
-        </button>
+    <main className="page">
+      <div className="page-header">
+        <div>
+          <h1>Translate</h1>
+          <p className="subtitle">한국어 원문을 붙여넣고 Translate를 누르세요.</p>
+        </div>
       </div>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      <section className="card">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="번역할 한국어 원문을 입력하세요"
+          rows={10}
+        />
+        <div style={{ marginTop: 10 }}>
+          <button className="btn btn-primary" onClick={handleTranslateClick} disabled={busy || phase === "reviewing" || !text.trim()}>
+            {phase === "analyzing" ? "Checking glossary terms..." : phase === "translating" ? "Translating..." : "Translate"}
+          </button>
+        </div>
+        {error && <p className="error-text">{error}</p>}
+      </section>
 
       {phase === "reviewing" && analyzeResult && (
-        <section style={{ marginTop: 24 }}>
-          <h2>Missing Glossary Terms ({analyzeResult.missing_terms.length})</h2>
-          <p>번역 전에 아래 용어의 공식 영문 번역을 확인/입력하고 저장하면 이어서 번역이 진행됩니다.</p>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={cellStyle}>Korean</th>
-                <th style={cellStyle}>Suggested</th>
-                <th style={cellStyle}>English (en_term)</th>
-                <th style={cellStyle}>Aliases</th>
-                <th style={cellStyle}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analyzeResult.missing_terms.map((t: CandidateTerm) => {
-                const edit = edits[t.ko_term];
-                if (!edit) return null;
-                return (
-                  <tr key={t.ko_term}>
-                    <td style={cellStyle}>{t.ko_term}</td>
-                    <td style={cellStyle}>{t.suggested_translation}</td>
-                    <td style={cellStyle}>
-                      <input
-                        value={edit.en_term}
-                        onChange={(e) => updateEdit(t.ko_term, "en_term", e.target.value)}
-                        style={{ width: "100%" }}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <input
-                        value={edit.aliases}
-                        onChange={(e) => updateEdit(t.ko_term, "aliases", e.target.value)}
-                        placeholder="comma,separated"
-                        style={{ width: "100%" }}
-                      />
-                    </td>
-                    <td style={cellStyle}>
-                      <select value={edit.status} onChange={(e) => updateEdit(t.ko_term, "status", e.target.value)}>
-                        <option value="approved">approved</option>
-                        <option value="pending_reference">pending_reference</option>
-                        <option value="deprecated">deprecated</option>
-                      </select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <button onClick={handleSaveAndTranslate} disabled={busy} style={{ marginTop: 8 }}>
-            Save & Translate
+        <section className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 15 }}>Missing Glossary Terms ({analyzeResult.missing_terms.length})</h2>
+          <p className="hint">번역 전에 아래 용어의 공식 영문 번역을 확인/입력하고 저장하면 이어서 번역이 진행됩니다.</p>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Korean</th>
+                  <th>Suggested</th>
+                  <th>English (en_term)</th>
+                  <th>Aliases</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analyzeResult.missing_terms.map((t: CandidateTerm) => {
+                  const edit = edits[t.ko_term];
+                  if (!edit) return null;
+                  return (
+                    <tr key={t.ko_term}>
+                      <td>{t.ko_term}</td>
+                      <td className="hint">{t.suggested_translation}</td>
+                      <td>
+                        <input value={edit.en_term} onChange={(e) => updateEdit(t.ko_term, "en_term", e.target.value)} />
+                      </td>
+                      <td>
+                        <input
+                          value={edit.aliases}
+                          onChange={(e) => updateEdit(t.ko_term, "aliases", e.target.value)}
+                          placeholder="comma,separated"
+                        />
+                      </td>
+                      <td>
+                        <select value={edit.status} onChange={(e) => updateEdit(t.ko_term, "status", e.target.value)}>
+                          <option value="approved">approved</option>
+                          <option value="pending_reference">pending_reference</option>
+                          <option value="deprecated">deprecated</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <button className="btn btn-primary" onClick={handleSaveAndTranslate} disabled={busy} style={{ marginTop: 12 }}>
+            Save &amp; Translate
           </button>
         </section>
       )}
@@ -162,5 +163,3 @@ export default function TranslatePage() {
     </main>
   );
 }
-
-const cellStyle: React.CSSProperties = { border: "1px solid #ddd", padding: 6, textAlign: "left" };

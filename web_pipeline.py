@@ -11,6 +11,7 @@ import glossary_manager as gm
 import term_extractor
 import audit as audit_mod
 import db_glossary
+import db_translations
 from prompts import build_translation_prompt
 from llm_providers import build_generate_fns
 
@@ -74,13 +75,16 @@ def analyze_text(text):
     }
 
 
-def translate_text(text):
+def translate_text(text, user_id=None):
     """Step 2: protect glossary terms, translate, restore, audit, repair --
-    same sequence as translation_graph.py's post-glossary-update nodes."""
+    same sequence as translation_graph.py's post-glossary-update nodes.
+    Persists a Translation row (source/output text, warnings, glossary terms
+    applied, token usage, user_id) for the backoffice's audit trail."""
     glossary = db_glossary.fetch_glossary_rows()
-    generate_fns = build_generate_fns()
+    usage = {}
+    generate_fns = build_generate_fns(usage_tracker=usage)
 
-    protected_text, placeholder_map, _matches = _protect_glossary_terms(text, glossary)
+    protected_text, placeholder_map, matches = _protect_glossary_terms(text, glossary)
     translation_draft = generate_fns["translation"](build_translation_prompt(protected_text)).strip()
 
     final_translation = translation_draft
@@ -101,6 +105,17 @@ def translate_text(text):
     if audit_report.get("has_violation"):
         warnings.append(f"Glossary violations remained after {repair_count} repair attempt(s).")
     warnings.extend(audit_report.get("format_warnings", []))
+
+    matched_terms = [{"ko_term": m["ko_term"], "en_term": m["en_term"]} for m in matches]
+    db_translations.insert_translation(
+        source_text=text,
+        translated_text=final_translation,
+        warnings=warnings,
+        matched_terms=matched_terms,
+        input_tokens=usage.get("input_tokens"),
+        output_tokens=usage.get("output_tokens"),
+        user_id=user_id,
+    )
 
     return {
         "translation": final_translation,

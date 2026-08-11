@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function LoginForm() {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,7 @@ function LoginForm() {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -34,22 +35,34 @@ function LoginForm() {
   }
 
   return (
-    <main style={{ maxWidth: 360, margin: "80px auto", padding: 16 }}>
-      <h1>Admin Login</h1>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Admin password"
-          autoFocus
-          style={{ width: "100%", padding: 8, marginBottom: 8 }}
-        />
-        <button type="submit" disabled={loading} style={{ width: "100%", padding: 8 }}>
+    <main className="auth-page">
+      <form className="auth-card" onSubmit={handleSubmit}>
+        <h1>Sign in</h1>
+        <label className="field">
+          <span>Username</span>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="username"
+            autoFocus
+            autoComplete="username"
+          />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="password"
+            autoComplete="current-password"
+          />
+        </label>
+        <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
+        {error && <p className="error-text">{error}</p>}
       </form>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
     </main>
   );
 }

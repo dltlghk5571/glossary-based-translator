@@ -13,29 +13,21 @@ export default function TranslationPanel({ result }: { result: TranslateResult }
   }
 
   return (
-    <section style={{ marginTop: 24 }}>
-      <h2>Translation</h2>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-        <button onClick={copyOutput}>{copied ? "Copied!" : "Copy output"}</button>
+    <section className="card" style={{ marginTop: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <h2 style={{ margin: 0, fontSize: 15 }}>Translation</h2>
+        <button className="btn btn-sm" onClick={copyOutput}>
+          {copied ? "Copied!" : "Copy output"}
+        </button>
       </div>
-      <pre
-        style={{
-          whiteSpace: "pre-wrap",
-          background: "#f7f7f7",
-          padding: 12,
-          borderRadius: 4,
-          border: "1px solid #ddd",
-        }}
-      >
-        {result.translation}
-      </pre>
+      <pre className="output-block">{result.translation}</pre>
 
       {result.warnings.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <h3>Warnings</h3>
-          <ul>
+        <div style={{ marginTop: 14 }}>
+          <h3 style={{ fontSize: 13, margin: "0 0 6px", color: "var(--warning)" }}>Warnings</h3>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
             {result.warnings.map((w, i) => (
-              <li key={i} style={{ color: "#a05a00" }}>
+              <li key={i} style={{ color: "var(--warning)", fontSize: 14 }}>
                 {w}
               </li>
             ))}
@@ -44,11 +36,11 @@ export default function TranslationPanel({ result }: { result: TranslateResult }
       )}
 
       {result.audit_report.violations.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <h3>Glossary Violations</h3>
-          <ul>
+        <div style={{ marginTop: 14 }}>
+          <h3 style={{ fontSize: 13, margin: "0 0 6px", color: "var(--danger)" }}>Glossary Violations</h3>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
             {result.audit_report.violations.map((v, i) => (
-              <li key={i} style={{ color: "crimson" }}>
+              <li key={i} style={{ color: "var(--danger)", fontSize: 14 }}>
                 [{v.ko_term || "?"}] {v.issue} (expected: {v.required_en_term || "-"}, found: {v.found || "-"})
               </li>
             ))}

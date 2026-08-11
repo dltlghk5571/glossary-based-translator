@@ -4,8 +4,6 @@ import { useState } from "react";
 import { updateGlossaryTerm } from "@/lib/api";
 import type { GlossaryTerm } from "@/lib/types";
 
-const cellStyle: React.CSSProperties = { border: "1px solid #ddd", padding: 6, textAlign: "left" };
-
 export default function TermTable({
   terms,
   onChanged,
@@ -43,76 +41,84 @@ export default function TermTable({
     }
   }
 
+  if (terms.length === 0) {
+    return <p className="hint">No terms found.</p>;
+  }
+
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead>
-        <tr>
-          <th style={cellStyle}>Korean</th>
-          <th style={cellStyle}>English</th>
-          <th style={cellStyle}>Type</th>
-          <th style={cellStyle}>Aliases</th>
-          <th style={cellStyle}>Status</th>
-          <th style={cellStyle}>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {terms.map((term) => {
-          const isEditing = editingId === term.id;
-          return (
-            <tr key={term.id}>
-              <td style={cellStyle}>{term.korean}</td>
-              <td style={cellStyle}>
-                {isEditing ? (
-                  <input
-                    value={draft.english ?? ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, english: e.target.value }))}
-                    style={{ width: "100%" }}
-                  />
-                ) : (
-                  term.english
-                )}
-              </td>
-              <td style={cellStyle}>{term.type}</td>
-              <td style={cellStyle}>
-                {isEditing ? (
-                  <input
-                    value={draft.aliases ?? ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, aliases: e.target.value }))}
-                    style={{ width: "100%" }}
-                  />
-                ) : (
-                  term.aliases
-                )}
-              </td>
-              <td style={cellStyle}>{term.status}</td>
-              <td style={cellStyle}>
-                {isEditing ? (
-                  <>
-                    <button onClick={() => save(term)} disabled={savingId === term.id}>
-                      Save
-                    </button>{" "}
-                    <button onClick={() => setEditingId(null)}>Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => startEdit(term)}>Edit</button>{" "}
-                    {term.status !== "approved" && (
-                      <button onClick={() => setStatus(term, "approved")} disabled={savingId === term.id}>
-                        Approve
+    <div className="table-wrap">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Korean</th>
+            <th>English</th>
+            <th>Type</th>
+            <th>Aliases</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {terms.map((term) => {
+            const isEditing = editingId === term.id;
+            return (
+              <tr key={term.id}>
+                <td>{term.korean}</td>
+                <td>
+                  {isEditing ? (
+                    <input value={draft.english ?? ""} onChange={(e) => setDraft((d) => ({ ...d, english: e.target.value }))} />
+                  ) : (
+                    term.english
+                  )}
+                </td>
+                <td className="hint">{term.type}</td>
+                <td>
+                  {isEditing ? (
+                    <input value={draft.aliases ?? ""} onChange={(e) => setDraft((d) => ({ ...d, aliases: e.target.value }))} />
+                  ) : (
+                    term.aliases
+                  )}
+                </td>
+                <td>
+                  <span className={`badge badge-${term.status}`}>{term.status}</span>
+                </td>
+                <td>
+                  {isEditing ? (
+                    <div className="btn-row">
+                      <button className="btn btn-sm btn-primary" onClick={() => save(term)} disabled={savingId === term.id}>
+                        Save
                       </button>
-                    )}{" "}
-                    {term.status !== "deprecated" && (
-                      <button onClick={() => setStatus(term, "deprecated")} disabled={savingId === term.id}>
-                        Deprecate
+                      <button className="btn btn-sm" onClick={() => setEditingId(null)}>
+                        Cancel
                       </button>
-                    )}
-                  </>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+                    </div>
+                  ) : (
+                    <div className="btn-row">
+                      <button className="btn btn-sm" onClick={() => startEdit(term)}>
+                        Edit
+                      </button>
+                      {term.status !== "approved" && (
+                        <button className="btn btn-sm" onClick={() => setStatus(term, "approved")} disabled={savingId === term.id}>
+                          Approve
+                        </button>
+                      )}
+                      {term.status !== "deprecated" && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => setStatus(term, "deprecated")}
+                          disabled={savingId === term.id}
+                        >
+                          Deprecate
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

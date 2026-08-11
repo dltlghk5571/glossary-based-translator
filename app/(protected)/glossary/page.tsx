@@ -35,42 +35,55 @@ export default function GlossaryPage() {
   }
 
   return (
-    <main>
-      <h1>Glossary</h1>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && load()}
-          placeholder="Search ko/en/aliases"
-        />
-        <button onClick={load}>Search</button>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="approved">approved</option>
-          <option value="pending_reference">pending_reference</option>
-          <option value="deprecated">deprecated</option>
-        </select>
-        <button
-          onClick={async () => {
-            const res = await fetch("/api/glossary/export", { method: "POST" });
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "glossary_export.csv";
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          Export CSV
-        </button>
+    <main className="page">
+      <div className="page-header">
+        <div>
+          <h1>Glossary</h1>
+          <p className="subtitle">번역 파이프라인이 강제 적용하는 공식 용어집입니다.</p>
+        </div>
       </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      {!loading && !error && <TermTable terms={terms} onChanged={handleChanged} />}
+      <section className="card">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Search ko/en/aliases"
+            style={{ flex: 1, minWidth: 200 }}
+          />
+          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: "auto" }}>
+            <option value="">All statuses</option>
+            <option value="approved">approved</option>
+            <option value="pending_reference">pending_reference</option>
+            <option value="deprecated">deprecated</option>
+          </select>
+          <button className="btn" onClick={load}>
+            Search
+          </button>
+          <button
+            className="btn"
+            onClick={async () => {
+              const res = await fetch("/api/glossary/export", { method: "POST" });
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "glossary_export.csv";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
+      </section>
+
+      {error && <p className="error-text">{error}</p>}
+
+      <section className="card" style={{ marginTop: 16 }}>
+        {loading ? <p className="hint">Loading...</p> : <TermTable terms={terms} onChanged={handleChanged} />}
+      </section>
     </main>
   );
 }

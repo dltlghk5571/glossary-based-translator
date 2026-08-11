@@ -40,23 +40,31 @@ class AnalyzeTextTests(unittest.TestCase):
 
 
 class TranslateTextTests(unittest.TestCase):
+    @patch("web_pipeline.db_translations.insert_translation")
     @patch("web_pipeline.db_glossary.fetch_glossary_rows")
     @patch("web_pipeline.build_generate_fns")
-    def test_protects_and_restores_glossary_term(self, mock_generate_fns, mock_fetch):
+    def test_protects_and_restores_glossary_term(self, mock_generate_fns, mock_fetch, mock_insert):
         mock_fetch.return_value = GLOSSARY
         mock_generate_fns.return_value = stub_generate_fns(
             translation_response="The __TERM_001__ met today."
         )
 
-        result = web_pipeline.translate_text("중앙운영위원회는 오늘 회의를 열었다.")
+        result = web_pipeline.translate_text("중앙운영위원회는 오늘 회의를 열었다.", user_id=7)
 
         self.assertIn("Central Steering Committee", result["translation"])
         self.assertNotIn("__TERM_001__", result["translation"])
         self.assertFalse(result["audit_report"]["has_violation"])
+        mock_insert.assert_called_once()
+        self.assertEqual(mock_insert.call_args.kwargs["user_id"], 7)
+        self.assertEqual(
+            mock_insert.call_args.kwargs["matched_terms"],
+            [{"ko_term": "중앙운영위원회", "en_term": "Central Steering Committee"}],
+        )
 
+    @patch("web_pipeline.db_translations.insert_translation")
     @patch("web_pipeline.db_glossary.fetch_glossary_rows")
     @patch("web_pipeline.build_generate_fns")
-    def test_repairs_dropped_glossary_term(self, mock_generate_fns, mock_fetch):
+    def test_repairs_dropped_glossary_term(self, mock_generate_fns, mock_fetch, mock_insert):
         mock_fetch.return_value = GLOSSARY
         mock_generate_fns.return_value = stub_generate_fns(
             translation_response="The committee met today.",  # placeholder dropped -> violation
@@ -67,6 +75,7 @@ class TranslateTextTests(unittest.TestCase):
 
         self.assertIn("Central Steering Committee", result["translation"])
         self.assertFalse(result["audit_report"]["has_violation"])
+        mock_insert.assert_called_once()
 
 
 if __name__ == "__main__":

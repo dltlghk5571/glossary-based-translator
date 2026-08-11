@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedRequest } from "@/lib/auth";
+import { getSessionUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs"; // Prisma's pg driver adapter needs Node, not edge
@@ -23,7 +23,7 @@ function csvEscape(value: unknown): string {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await isAuthorizedRequest(request))) {
+  if (!(await getSessionUserFromRequest(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
