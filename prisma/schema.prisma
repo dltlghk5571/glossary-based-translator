@@ -1,0 +1,61 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Glossary {
+  id          Int      @id @default(autoincrement())
+  korean      String   @unique
+  english     String
+  description String?
+  category    String?
+
+  // Used by the translation pipeline's glossary matching/audit (glossary_manager.py):
+  // type/status classify the entry, aliases lets alternate Korean surface forms match,
+  // status="approved" is required for a term to be force-matched during translation.
+  type        String   @default("General")
+  aliases     String   @default("")
+  usageNote   String   @default("")
+  status      String   @default("approved")
+  source      String   @default("user")
+  lastContext String   @default("")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([korean])
+  @@index([english])
+  @@index([status])
+}
+
+model Translation {
+  id             Int      @id @default(autoincrement())
+  sourceText     String
+  translatedText String
+  status         String   @default("draft")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  history TranslationHistory[]
+}
+
+model TranslationHistory {
+  id            Int      @id @default(autoincrement())
+  translationId Int
+  beforeText    String?
+  afterText     String
+  createdAt     DateTime @default(now())
+
+  translation Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+
+  @@index([translationId])
+}

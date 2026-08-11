@@ -46,6 +46,20 @@ glossary.csv.bak
 
 # Local tooling
 .claude/
+.agents/
+.windsurf/
+skills-lock.json
 
 # Graphify generated outputs
 graphify-out/
+
+# Next.js / Node
+node_modules/
+.next/
+next-env.d.ts
+.vercel/
+.vercel
+.env*
+
+/lib/generated/prisma
+tsconfig.tsbuildinfo

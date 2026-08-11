@@ -154,8 +154,74 @@ Actually calling the LLM still needs an API key; only the *scoring* layer (`eval
 ## Tests
 
 ```bash
-python -m unittest test_translation_system test_evaluation -v
+python -m unittest test_translation_system test_evaluation test_web_pipeline test_api_handlers -v
+npm run lint
+npm run build
 ```
+
+## Backoffice web app (Vercel)
+
+A Next.js backoffice (`/translate`, `/glossary`) sits alongside the CLI, split across two
+persistence paths that share one Postgres (Neon) database and one schema source of truth
+(Prisma migrations under `prisma/migrations/`):
+
+- **Glossary CRUD** (`app/api/glossary/**`) is plain Next.js Route Handlers using Prisma
+  Client (`lib/prisma.ts`) against the `Glossary` table. This replaced an earlier
+  Python/psycopg version of these same endpoints.
+- **Analyze/translate** (`api/analyze.py`, `api/translate.py`, Vercel Python Functions) reuse
+  the CLI's pipeline modules (`glossary_manager.py`, `term_extractor.py`, `audit.py`,
+  `llm_providers.py`) through `web_pipeline.py`, which replaces the CLI's `interrupt()`-driven
+  human-in-the-loop with explicit `analyze → approve → translate` steps. They read the same
+  `Glossary` table read-only via raw SQL (`db_glossary.py`) instead of `glossary.csv`, since
+  Vercel's filesystem is read-only at runtime and Prisma Client is TypeScript-only (no Python
+  binding) -- so the Python side reads the Prisma-managed table directly rather than duplicating
+  the schema.
+
+The CLI (`translator.py`) is unaffected and keeps using `glossary.csv` directly.
+
+### Local dev
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+npm install
+npx prisma migrate deploy   # applies prisma/migrations/ to $DATABASE_URL (direct connection)
+npm run dev                 # next dev -- UI, /login, /glossary (Prisma), everything except api/*.py
+```
+
+Use plain `next dev` (`npm run dev`) for day-to-day frontend/Glossary work — pages, the login
+gate, and `/api/glossary/**` (Prisma) all run under it with no extra setup.
+
+`vercel dev` is the only way to exercise `api/*.py` (`/api/analyze`, `/api/translate`) locally,
+since those are separate Python serverless functions `next dev` doesn't serve. In practice this
+CLI version's local Python+Next.js middleware emulation has been unreliable in this repo (global
+502s from `vercel dev` unrelated to application code — confirmed by the same routes returning
+200 under plain `next dev`). If `vercel dev` 502s for you, don't chase it locally: verify
+`/api/analyze` and `/api/translate` via the Python test suite (`test_api_handlers.py` exercises
+the actual handler classes over a real local HTTP connection, mocking only the LLM/DB calls) and
+do the final end-to-end check on a Vercel Preview or Production deployment, where the build
+pipeline differs from `vercel dev`'s local emulation.
+
+### Deploy to Vercel
+
+1. Import this GitHub repo in the Vercel dashboard (Framework Preset: Next.js — Python functions
+   under `api/` are auto-detected from `requirements.txt`).
+2. Set Environment Variables (Project Settings → Environment Variables):
+   - `GOOGLE_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` — at least the provider(s)
+     selected via `TERM_EXTRACTION_PROVIDER` / `TRANSLATION_PROVIDER` / `REPAIR_PROVIDER`
+     (default: Anthropic for all three).
+   - `DATABASE_URL` — pooled Postgres connection string (app runtime / Prisma Client / Python).
+   - `DATABASE_URL_UNPOOLED` — direct (non-pooled) connection string, used by `prisma.config.ts`
+     for the Prisma CLI (`migrate`/`validate`/`studio`) since DDL is unreliable through a
+     transaction-mode pooler.
+   - `ADMIN_PASSWORD` — gates `/translate`, `/glossary`, `/evaluation` behind a login page
+     (`middleware.ts`); leaving it unset disables the gate (local dev only — always set it in
+     production).
+3. Build command: `next build` (default). `npm install`'s `postinstall` script runs
+   `prisma generate` automatically, so the generated client (`lib/generated/prisma/`, gitignored)
+   is always rebuilt from the current schema on each deploy. Local dev command: `vercel dev`.
+   Deploy: `vercel --prod` or push to the connected branch.
+4. Run `npx prisma migrate deploy` against the production `DATABASE_URL_UNPOOLED` once before
+   first use, and again after any schema change.
 
 ## Notes
 
