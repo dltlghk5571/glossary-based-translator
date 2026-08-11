@@ -200,9 +200,9 @@ gate, and `/api/glossary/**` (Prisma) all run under it with no extra setup.
 
 `vercel dev` is the only way to exercise `api/*.py` (`/api/analyze`, `/api/translate`) locally,
 since those are separate Python serverless functions `next dev` doesn't serve. In practice this
-CLI version's local Python+Next.js middleware emulation has been unreliable in this repo (global
-502s from `vercel dev` unrelated to application code — confirmed by the same routes returning
-200 under plain `next dev`). If `vercel dev` 502s for you, don't chase it locally: verify
+CLI version's local Python+Next.js emulation has been unreliable in this repo (global 502s from
+`vercel dev` unrelated to application code — confirmed by the same routes returning 200 under
+plain `next dev`). If `vercel dev` 502s for you, don't chase it locally: verify
 `/api/analyze` and `/api/translate` via the Python test suite (`test_api_handlers.py` exercises
 the actual handler class over a real local HTTP connection, mocking only the LLM/DB calls) and
 do the final end-to-end check on a Vercel Preview or Production deployment, where the build
@@ -220,9 +220,12 @@ pipeline differs from `vercel dev`'s local emulation.
    - `DATABASE_URL_UNPOOLED` — direct (non-pooled) connection string, used by `prisma.config.ts`
      for the Prisma CLI (`migrate`/`validate`/`studio`) since DDL is unreliable through a
      transaction-mode pooler.
-   - `ADMIN_PASSWORD` — gates `/translate`, `/glossary`, `/evaluation` behind a login page
-     (`middleware.ts`); leaving it unset disables the gate (local dev only — always set it in
-     production).
+   - `ADMIN_PASSWORD` — gates `/translate`, `/glossary` behind a login page
+     (`app/(protected)/layout.tsx`); leaving it unset disables the gate (local dev only — always
+     set it in production). This runs as a Node.js Server Component, not `middleware.ts` --
+     Vercel's edge runtime has a platform-level `ReferenceError: __dirname is not defined` bug
+     that broke every `middleware.ts` on this project regardless of its content (reproduced with
+     an empty one importing nothing but `next/server`), so the gate lives in a layout instead.
 3. Build command: `next build` (default). `npm install`'s `postinstall` script runs
    `prisma generate` automatically, so the generated client (`lib/generated/prisma/`, gitignored)
    is always rebuilt from the current schema on each deploy. Local dev command: `vercel dev`.
