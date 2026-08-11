@@ -1,10 +1,16 @@
-"""Direct tests for the Vercel Python function handler (api/index.py,
-api/_utils.py) -- spins the handler up on a real local socket via
-http.server so do_POST's routing/auth/response-writing runs exactly as it
-would in production, without needing `vercel dev`.
+"""Direct tests for the Vercel Python function handler (api/index.py) --
+spins the handler up on a real local socket via http.server so do_POST's
+routing/auth/response-writing runs exactly as it would in production,
+without needing `vercel dev`.
+
+Deliberately does NOT add api/ to sys.path here: api/index.py must resolve
+its own imports (it's loaded via importlib in production, not run as a
+script, so its own directory isn't auto-added to sys.path the way a
+locally-run script's would be). Adding it here would mask that class of bug.
 """
 import http.client
 import http.server
+import importlib.util
 import json
 import os
 import sys
@@ -13,10 +19,11 @@ import unittest
 from http.server import HTTPServer
 from unittest.mock import patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "api"))
-
-import index as index_module  # noqa: E402
-import _utils  # noqa: E402
+_INDEX_PATH = os.path.join(os.path.dirname(__file__), "api", "index.py")
+_spec = importlib.util.spec_from_file_location("index", _INDEX_PATH)
+index_module = importlib.util.module_from_spec(_spec)
+sys.modules["index"] = index_module  # so @patch("index.web_pipeline...") string targets resolve
+_spec.loader.exec_module(index_module)
 
 # BaseHTTPRequestHandler's default access-log line does a reverse DNS lookup
 # (socket.getfqdn()) per request, which is slow/flaky in a sandboxed test
@@ -116,16 +123,16 @@ class IsAuthorizedTests(unittest.TestCase):
 
     @patch.dict(os.environ, {}, clear=True)
     def test_no_admin_password_disables_gate(self):
-        self.assertTrue(_utils.is_authorized(self._FakeHandler()))
+        self.assertTrue(index_module.is_authorized(self._FakeHandler()))
 
     @patch.dict(os.environ, {"ADMIN_PASSWORD": "secret"})
     def test_missing_cookie_is_unauthorized(self):
-        self.assertFalse(_utils.is_authorized(self._FakeHandler()))
+        self.assertFalse(index_module.is_authorized(self._FakeHandler()))
 
     @patch.dict(os.environ, {"ADMIN_PASSWORD": "secret"})
     def test_valid_session_cookie_is_authorized(self):
-        token = _utils._session_token()
-        self.assertTrue(_utils.is_authorized(self._FakeHandler(cookie=f"admin_session={token}")))
+        token = index_module._session_token()
+        self.assertTrue(index_module.is_authorized(self._FakeHandler(cookie=f"admin_session={token}")))
 
 
 if __name__ == "__main__":
