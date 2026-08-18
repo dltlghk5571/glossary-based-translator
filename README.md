@@ -157,7 +157,26 @@ Actually calling the LLM still needs an API key; only the *scoring* layer (`eval
 python -m unittest test_translation_system test_evaluation test_web_pipeline test_api_handlers -v
 npm run lint
 npm run build
+npm run test              # lib/*.test.ts -- pure-logic unit tests, no DB/server needed
+npm run test:integration  # see below -- needs TEST_DATABASE_URL
 ```
+
+**`npm run test:integration`** (`test/glossary-flow.integration.test.ts`) is an E2E-style
+integration test: it spawns a real `next dev` server and drives it over real HTTP with forged
+session cookies, exercising the actual `/api/glossary/approve` and `/api/glossary/suggest` route
+handlers and a real Postgres.
+
+- **Never run it against a production or shared dev database.** It requires `TEST_DATABASE_URL`
+  in the environment and refuses to run without it (fails fast with a clear error rather than
+  silently falling back to `DATABASE_URL`) -- the spawned server itself is launched with its
+  `DATABASE_URL` overridden to `TEST_DATABASE_URL`, so the app under test can't reach the real DB
+  either.
+- Point `TEST_DATABASE_URL` at a dedicated test database -- e.g. a separate Neon branch --
+  never at the same database `DATABASE_URL` points to. Apply migrations to it once before the
+  first run: `DATABASE_URL_UNPOOLED=$TEST_DATABASE_URL npx prisma migrate deploy`.
+- Test rows (users and glossary terms) are prefixed `__itest_` and deleted in an `after()` hook,
+  but using a dedicated database is still required -- prefix-based cleanup is a safety net, not
+  the isolation boundary.
 
 ## Backoffice web app (Vercel)
 

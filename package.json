@@ -6,6 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --test lib/*.test.ts",
+    "test:integration": "node --env-file=.env --test test/*.integration.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

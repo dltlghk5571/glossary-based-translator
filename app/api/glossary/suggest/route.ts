@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canEditGlossary, getSessionUserFromRequest } from "@/lib/auth";
-import { buildGlossaryUpsertData } from "@/lib/glossary";
+import { getSessionUserFromRequest } from "@/lib/auth";
+import { buildGlossaryUpsertData, canSuggestGlossaryTerm } from "@/lib/glossary";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs"; // Prisma's pg driver adapter needs Node, not edge
 export const dynamic = "force-dynamic"; // session-cookie-dependent response -- never let Vercel/Next cache this across users
 
-// Glossary management (add/approve/deprecate terms) -- admin/editor only.
-// Translate-flow term suggestions go through /api/glossary/suggest instead.
+// Any authenticated user hits this while translating, when the analyzer finds
+// a term missing from the glossary. Always lands as "pending_reference" --
+// only /api/glossary/approve (admin/editor) can mark a term "approved".
 export async function POST(request: NextRequest) {
-  if (!canEditGlossary(await getSessionUserFromRequest(request))) {
+  const user = await getSessionUserFromRequest(request);
+  if (!canSuggestGlossaryTerm(user)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
@@ -20,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "korean and english are required" }, { status: 400 });
   }
 
-  const data = buildGlossaryUpsertData(body);
+  const data = buildGlossaryUpsertData(body, { status: "pending_reference", source: "translation_flow" });
 
   const term = await prisma.glossary.upsert({
     where: { korean },

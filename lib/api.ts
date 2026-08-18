@@ -52,6 +52,15 @@ export function approveTerm(term: Partial<GlossaryTerm>) {
   });
 }
 
+// Used from the translate flow -- always lands as "pending_reference",
+// regardless of any status the caller passes in.
+export function suggestTerm(term: Partial<GlossaryTerm>) {
+  return request<{ ok: true; term: GlossaryTerm }>("/api/glossary/suggest", {
+    method: "POST",
+    body: JSON.stringify(term),
+  });
+}
+
 export function listGlossary(params: { status?: string; q?: string }) {
   const query = new URLSearchParams();
   if (params.status) query.set("status", params.status);

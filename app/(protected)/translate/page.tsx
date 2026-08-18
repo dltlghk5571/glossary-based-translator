@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { analyze, approveTerm, translate } from "@/lib/api";
-import type { AnalyzeResult, CandidateTerm, GlossaryStatus, TranslateResult } from "@/lib/types";
+import { analyze, suggestTerm, translate } from "@/lib/api";
+import type { AnalyzeResult, CandidateTerm, TranslateResult } from "@/lib/types";
 import TranslationPanel from "@/components/TranslationPanel";
 
-type MissingEdit = { en_term: string; aliases: string; status: GlossaryStatus };
+type MissingEdit = { en_term: string; aliases: string };
 type Phase = "idle" | "analyzing" | "reviewing" | "translating";
 
 export default function TranslatePage() {
@@ -45,7 +45,7 @@ export default function TranslatePage() {
       setAnalyzeResult(result);
       const initial: Record<string, MissingEdit> = {};
       for (const t of result.missing_terms) {
-        initial[t.ko_term] = { en_term: t.suggested_translation || "", aliases: "", status: "approved" };
+        initial[t.ko_term] = { en_term: t.suggested_translation || "", aliases: "" };
       }
       setEdits(initial);
       setPhase("reviewing");
@@ -66,13 +66,11 @@ export default function TranslatePage() {
       for (const term of analyzeResult.missing_terms) {
         const edit = edits[term.ko_term];
         if (!edit || !edit.en_term.trim()) continue;
-        await approveTerm({
+        await suggestTerm({
           korean: term.ko_term,
           english: edit.en_term.trim(),
           type: term.type || "General",
           aliases: edit.aliases.trim(),
-          status: edit.status,
-          source: "user",
           lastContext: term.context_sentence || "",
         });
       }
@@ -111,6 +109,7 @@ export default function TranslatePage() {
         <section className="card" style={{ marginTop: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 15 }}>Missing Glossary Terms ({analyzeResult.missing_terms.length})</h2>
           <p className="hint">번역 전에 아래 용어의 공식 영문 번역을 확인/입력하고 저장하면 이어서 번역이 진행됩니다.</p>
+          <p className="hint">저장된 용어는 &quot;pending_reference&quot; 상태로 등록되며, 관리자/편집자가 글로서리 페이지에서 검토 후 승인합니다.</p>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -119,7 +118,6 @@ export default function TranslatePage() {
                   <th>Suggested</th>
                   <th>English (en_term)</th>
                   <th>Aliases</th>
-                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,13 +137,6 @@ export default function TranslatePage() {
                           onChange={(e) => updateEdit(t.ko_term, "aliases", e.target.value)}
                           placeholder="comma,separated"
                         />
-                      </td>
-                      <td>
-                        <select value={edit.status} onChange={(e) => updateEdit(t.ko_term, "status", e.target.value)}>
-                          <option value="approved">approved</option>
-                          <option value="pending_reference">pending_reference</option>
-                          <option value="deprecated">deprecated</option>
-                        </select>
                       </td>
                     </tr>
                   );
