@@ -59,7 +59,7 @@ def send_json(handler, status, payload):
 # and refuses to pick one. A single canonically-named file (api/index.py) with
 # one handler dispatching on self.path is the documented, unambiguous pattern.
 ROUTES = {
-    "/api/analyze": lambda text, user_id: web_pipeline.analyze_text(text),
+    "/api/analyze": lambda text, user_id: web_pipeline.analyze_text(text, user_id=user_id),
     "/api/translate": lambda text, user_id: web_pipeline.translate_text(text, user_id=user_id),
 }
 
@@ -79,5 +79,7 @@ class handler(BaseHTTPRequestHandler):
                 return send_json(self, 400, {"ok": False, "error": "text is required"})
             result = route(text, user_id)
             send_json(self, 200, result)
+        except web_pipeline.QuotaExceededError as e:
+            send_json(self, 403, {"ok": False, "error": "quota_exceeded", "quota": e.quota})
         except Exception as e:
             send_json(self, 500, {"ok": False, "error": str(e)})
