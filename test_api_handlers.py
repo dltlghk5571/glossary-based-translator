@@ -77,7 +77,7 @@ class AnalyzeRouteTests(_HandlerServerTestCase):
         status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
         self.assertEqual(status, 200)
         self.assertEqual(data["missing_terms"], [])
-        mock_analyze.assert_called_once_with("안녕하세요")
+        mock_analyze.assert_called_once_with("안녕하세요", user_id=1)
 
     @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_rejects_empty_text(self):
@@ -92,6 +92,17 @@ class AnalyzeRouteTests(_HandlerServerTestCase):
         status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
         self.assertEqual(status, 500)
         self.assertEqual(data["error"], "boom")
+
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
+    @patch("index.web_pipeline.analyze_text")
+    def test_quota_exceeded_becomes_403(self, mock_analyze):
+        mock_analyze.side_effect = index_module.web_pipeline.QuotaExceededError(
+            {"limit": 1000, "used": 1000, "bonus": 0, "remaining": 0}
+        )
+        status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
+        self.assertEqual(status, 403)
+        self.assertEqual(data["error"], "quota_exceeded")
+        self.assertEqual(data["quota"]["remaining"], 0)
 
     @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_unauthorized_without_session_cookie(self):
