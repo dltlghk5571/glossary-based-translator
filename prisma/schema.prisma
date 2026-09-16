@@ -45,7 +45,13 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  translations Translation[]
+  monthlyTokenLimit    Int      @default(100000)
+  tokensUsedThisPeriod Int      @default(0)
+  bonusTokens          Int      @default(0)
+  periodStart          DateTime @default(now())
+
+  topUpRequests TokenTopUpRequest[]
+  translations  Translation[]
 
   @@index([role])
 }
@@ -83,4 +89,18 @@ model TranslationHistory {
   translation Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
 
   @@index([translationId])
+}
+
+model TokenTopUpRequest {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id])
+  status        String    @default("pending") // pending | approved | denied
+  grantedTokens Int?
+  note          String    @default("")
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+
+  @@index([userId])
+  @@index([status])
 }
