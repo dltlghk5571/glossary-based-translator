@@ -12,10 +12,17 @@ import term_extractor
 import audit as audit_mod
 import db_glossary
 import db_translations
+import db_users
 from prompts import build_translation_prompt
 from llm_providers import build_generate_fns
 
 MAX_REPAIRS = 2
+
+
+class QuotaExceededError(Exception):
+    def __init__(self, quota):
+        super().__init__(f"Token quota exhausted: {quota['used']}/{quota['limit']} used, {quota['remaining']} remaining")
+        self.quota = quota
 
 
 def _detect_missing_terms(candidate_terms, glossary):
@@ -57,15 +64,24 @@ def _protect_glossary_terms(text, glossary):
     return "".join(pieces), placeholder_map, matches
 
 
-def analyze_text(text):
+def analyze_text(text, user_id=None):
     """Step 1: extract candidate terms, match against the glossary, surface
     missing ones for the user to fill in and approve (POST /api/glossary/approve)."""
+    if user_id is not None:
+        quota = db_users.get_quota(user_id)
+        if quota["remaining"] <= 0:
+            raise QuotaExceededError(quota)
+
     glossary = db_glossary.fetch_glossary_rows()
-    generate_fns = build_generate_fns()
+    usage = {}
+    generate_fns = build_generate_fns(usage_tracker=usage)
 
     candidate_terms = term_extractor.extract_candidate_terms(text, generate_fns["term_extraction"])
     matched_terms = gm.match_terms(text, glossary)
     missing_terms = _detect_missing_terms(candidate_terms, glossary)
+
+    if user_id is not None:
+        db_users.record_usage(user_id, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
 
     return {
         "candidate_terms": candidate_terms,
@@ -80,6 +96,11 @@ def translate_text(text, user_id=None):
     same sequence as translation_graph.py's post-glossary-update nodes.
     Persists a Translation row (source/output text, warnings, glossary terms
     applied, token usage, user_id) for the backoffice's audit trail."""
+    if user_id is not None:
+        quota = db_users.get_quota(user_id)
+        if quota["remaining"] <= 0:
+            raise QuotaExceededError(quota)
+
     glossary = db_glossary.fetch_glossary_rows()
     usage = {}
     generate_fns = build_generate_fns(usage_tracker=usage)
@@ -116,6 +137,9 @@ def translate_text(text, user_id=None):
         output_tokens=usage.get("output_tokens"),
         user_id=user_id,
     )
+
+    if user_id is not None:
+        db_users.record_usage(user_id, usage.get("input_tokens"), usage.get("output_tokens"))
 
     return {
         "translation": final_translation,
