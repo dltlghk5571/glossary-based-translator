@@ -41,6 +41,7 @@ export default function TranslatePage() {
       const result = await translate(text);
       setTranslateResult(result);
       setAnalyzeResult(null);
+      setBlockedQuota(null);
       setPhase("idle");
       await loadQuota();
     } catch (err) {
