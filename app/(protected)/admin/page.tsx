@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { adminListQuotas, adminListTopUps, adminResolveTopUp, adminUpdateQuotaLimit } from "@/lib/api";
+import type { OrgQuota, TopUpRequest } from "@/lib/types";
 
 type AdminUser = { id: number; username: string; role: string; createdAt: string };
 
@@ -19,6 +21,19 @@ export default function AdminPage() {
   const [newRole, setNewRole] = useState<"user" | "editor" | "admin">("user");
   const [issuedCredential, setIssuedCredential] = useState<{ username: string; password: string } | null>(null);
   const [creating, setCreating] = useState(false);
+  const [orgs, setOrgs] = useState<OrgQuota[]>([]);
+  const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
+  const [grantAmounts, setGrantAmounts] = useState<Record<number, string>>({});
+
+  async function loadQuotaData() {
+    try {
+      const [{ orgs }, { requests }] = await Promise.all([adminListQuotas(), adminListTopUps()]);
+      setOrgs(orgs);
+      setTopUps(requests);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load quota data");
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -35,6 +50,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     load();
+    loadQuotaData();
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
@@ -78,6 +94,31 @@ export default function AdminPage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete user");
+    }
+  }
+
+  async function handleUpdateLimit(userId: number, monthlyTokenLimit: number) {
+    setError("");
+    try {
+      await adminUpdateQuotaLimit(userId, monthlyTokenLimit);
+      await loadQuotaData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update limit");
+    }
+  }
+
+  async function handleResolveTopUp(id: number, action: "approve" | "deny") {
+    setError("");
+    try {
+      const grantedTokens = action === "approve" ? Number(grantAmounts[id] || 0) : undefined;
+      if (action === "approve" && (!grantedTokens || grantedTokens <= 0)) {
+        setError("지급할 토큰 수를 입력하세요.");
+        return;
+      }
+      await adminResolveTopUp(id, action, grantedTokens);
+      await loadQuotaData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resolve request");
     }
   }
 
@@ -156,6 +197,97 @@ export default function AdminPage() {
                         </button>
                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(u.id, u.username)}>
                           Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0, fontSize: 15 }}>단체별 토큰 쿼터</h2>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>사용량</th>
+                <th>월 한도</th>
+                <th>보너스</th>
+                <th>잔여</th>
+                <th>한도 수정</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orgs.map((org) => (
+                <tr key={org.id}>
+                  <td>{org.username}</td>
+                  <td>{org.tokensUsedThisPeriod.toLocaleString()}</td>
+                  <td>{org.monthlyTokenLimit.toLocaleString()}</td>
+                  <td>{org.bonusTokens.toLocaleString()}</td>
+                  <td>{(org.monthlyTokenLimit + org.bonusTokens - org.tokensUsedThisPeriod).toLocaleString()}</td>
+                  <td>
+                    <input
+                      type="number"
+                      defaultValue={org.monthlyTokenLimit}
+                      style={{ width: 100 }}
+                      onBlur={(e) => {
+                        const value = Number(e.target.value);
+                        if (Number.isInteger(value) && value >= 0 && value !== org.monthlyTokenLimit) {
+                          handleUpdateLimit(org.id, value);
+                        }
+                      }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0, fontSize: 15 }}>충전 요청 ({topUps.length})</h2>
+        {topUps.length === 0 ? (
+          <p className="hint">대기 중인 요청이 없습니다.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>사유</th>
+                  <th>요청일</th>
+                  <th>지급 토큰</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topUps.map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.user.username}</td>
+                    <td className="hint">{t.note || "-"}</td>
+                    <td className="hint">{new Date(t.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <input
+                        type="number"
+                        placeholder="예: 20000"
+                        style={{ width: 100 }}
+                        value={grantAmounts[t.id] || ""}
+                        onChange={(e) => setGrantAmounts((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                      />
+                    </td>
+                    <td>
+                      <div className="btn-row">
+                        <button className="btn btn-sm" onClick={() => handleResolveTopUp(t.id, "approve")}>
+                          승인
+                        </button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleResolveTopUp(t.id, "deny")}>
+                          거절
                         </button>
                       </div>
                     </td>
