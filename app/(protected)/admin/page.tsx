@@ -111,7 +111,7 @@ export default function AdminPage() {
     setError("");
     try {
       const grantedTokens = action === "approve" ? Number(grantAmounts[id] || 0) : undefined;
-      if (action === "approve" && (!grantedTokens || grantedTokens <= 0)) {
+      if (action === "approve" && (!Number.isInteger(grantedTokens) || grantedTokens! <= 0)) {
         setError("지급할 토큰 수를 입력하세요.");
         return;
       }
