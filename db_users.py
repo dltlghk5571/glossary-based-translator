@@ -22,7 +22,7 @@ def _compute_remaining(limit, bonus, used):
 def get_quota(user_id, now=None):
     """Returns {"limit", "used", "bonus", "remaining"}, applying the lazy
     monthly reset first if the stored period has rolled over."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -54,7 +54,7 @@ def get_quota(user_id, now=None):
 def record_usage(user_id, input_tokens, output_tokens, now=None):
     """Adds input_tokens + output_tokens to tokensUsedThisPeriod, applying
     the lazy monthly reset first so usage never lands in a stale period."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     get_quota(user_id, now=now)  # applies the reset if the period rolled over
 
     total = (input_tokens or 0) + (output_tokens or 0)

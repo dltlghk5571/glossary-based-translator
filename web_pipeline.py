@@ -81,7 +81,11 @@ def analyze_text(text, user_id=None):
     missing_terms = _detect_missing_terms(candidate_terms, glossary)
 
     if user_id is not None:
-        db_users.record_usage(user_id, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+        try:
+            db_users.record_usage(user_id, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("record_usage failed for user_id=%s after a successful analyze", user_id)
 
     return {
         "candidate_terms": candidate_terms,
@@ -139,7 +143,11 @@ def translate_text(text, user_id=None):
     )
 
     if user_id is not None:
-        db_users.record_usage(user_id, usage.get("input_tokens"), usage.get("output_tokens"))
+        try:
+            db_users.record_usage(user_id, usage.get("input_tokens"), usage.get("output_tokens"))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("record_usage failed for user_id=%s after a successful translation", user_id)
 
     return {
         "translation": final_translation,

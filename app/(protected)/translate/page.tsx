@@ -47,6 +47,7 @@ export default function TranslatePage() {
     } catch (err) {
       if (err instanceof QuotaExceededClientError) {
         setBlockedQuota(err.quota);
+        await loadQuota();
       } else {
         setError(err instanceof Error ? err.message : "Translate failed");
       }
@@ -76,6 +77,7 @@ export default function TranslatePage() {
     } catch (err) {
       if (err instanceof QuotaExceededClientError) {
         setBlockedQuota(err.quota);
+        await loadQuota();
       } else {
         setError(err instanceof Error ? err.message : "Analyze failed");
       }
