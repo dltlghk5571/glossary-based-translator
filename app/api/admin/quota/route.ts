@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
   if (!(await requireAdmin(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
+  await prisma.user.updateMany({
+    where: { periodStart: { lt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)) } },
+    data: { tokensUsedThisPeriod: 0, bonusTokens: 0, periodStart: new Date() },
+  });
   const orgs = await prisma.user.findMany({
     select: { id: true, username: true, monthlyTokenLimit: true, tokensUsedThisPeriod: true, bonusTokens: true },
     orderBy: { username: "asc" },

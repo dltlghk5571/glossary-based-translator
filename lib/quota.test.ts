@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isSamePeriod, computeRemaining } from "./quota.ts";
+import { isSamePeriod, computeRemaining } from "./quota-math.ts";
 
 test("isSamePeriod is true within the same calendar month", () => {
   assert.equal(isSamePeriod(new Date("2026-09-01T00:00:00Z"), new Date("2026-09-30T23:00:00Z")), true);
