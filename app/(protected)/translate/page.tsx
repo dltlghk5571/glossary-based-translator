@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { analyze, suggestTerm, translate } from "@/lib/api";
-import type { AnalyzeResult, CandidateTerm, TranslateResult } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { analyze, getQuota, QuotaExceededClientError, requestTopUp, suggestTerm, translate } from "@/lib/api";
+import type { AnalyzeResult, CandidateTerm, QuotaInfo, TranslateResult } from "@/lib/types";
 import TranslationPanel from "@/components/TranslationPanel";
 
 type MissingEdit = { en_term: string; aliases: string };
@@ -15,6 +15,23 @@ export default function TranslatePage() {
   const [edits, setEdits] = useState<Record<string, MissingEdit>>({});
   const [translateResult, setTranslateResult] = useState<TranslateResult | null>(null);
   const [error, setError] = useState("");
+  const [quota, setQuota] = useState<QuotaInfo | null>(null);
+  const [blockedQuota, setBlockedQuota] = useState<{ limit: number; used: number; bonus: number; remaining: number } | null>(null);
+  const [topUpNote, setTopUpNote] = useState("");
+  const [requestingTopUp, setRequestingTopUp] = useState(false);
+
+  async function loadQuota() {
+    try {
+      const q = await getQuota();
+      setQuota(q);
+    } catch {
+      // non-fatal -- balance display is a convenience, don't block the page on it
+    }
+  }
+
+  useEffect(() => {
+    loadQuota();
+  }, []);
 
   const busy = phase === "analyzing" || phase === "translating";
 
@@ -25,8 +42,13 @@ export default function TranslatePage() {
       setTranslateResult(result);
       setAnalyzeResult(null);
       setPhase("idle");
+      await loadQuota();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Translate failed");
+      if (err instanceof QuotaExceededClientError) {
+        setBlockedQuota(err.quota);
+      } else {
+        setError(err instanceof Error ? err.message : "Translate failed");
+      }
       setPhase("idle");
     }
   }
@@ -34,6 +56,7 @@ export default function TranslatePage() {
   async function handleTranslateClick() {
     if (!text.trim() || busy) return;
     setError("");
+    setBlockedQuota(null);
     setTranslateResult(null);
     setPhase("analyzing");
     try {
@@ -50,13 +73,30 @@ export default function TranslatePage() {
       setEdits(initial);
       setPhase("reviewing");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analyze failed");
+      if (err instanceof QuotaExceededClientError) {
+        setBlockedQuota(err.quota);
+      } else {
+        setError(err instanceof Error ? err.message : "Analyze failed");
+      }
       setPhase("idle");
     }
   }
 
   function updateEdit(koTerm: string, field: keyof MissingEdit, value: string) {
     setEdits((prev) => ({ ...prev, [koTerm]: { ...prev[koTerm], [field]: value } }));
+  }
+
+  async function handleRequestTopUp() {
+    setRequestingTopUp(true);
+    try {
+      await requestTopUp(topUpNote.trim());
+      setTopUpNote("");
+      await loadQuota();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setRequestingTopUp(false);
+    }
   }
 
   async function handleSaveAndTranslate() {
@@ -87,6 +127,11 @@ export default function TranslatePage() {
         <div>
           <h1>Translate</h1>
           <p className="subtitle">한국어 원문을 붙여넣고 Translate를 누르세요.</p>
+          {quota && (
+            <p className="hint">
+              이번 달 잔여 토큰: {quota.remaining.toLocaleString()} / {(quota.limit + quota.bonus).toLocaleString()}
+            </p>
+          )}
         </div>
       </div>
 
@@ -147,6 +192,28 @@ export default function TranslatePage() {
           <button className="btn btn-primary" onClick={handleSaveAndTranslate} disabled={busy} style={{ marginTop: 12 }}>
             Save &amp; Translate
           </button>
+        </section>
+      )}
+
+      {blockedQuota && (
+        <section className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 15 }}>이번 달 토큰 한도를 초과했습니다</h2>
+          <p className="hint">
+            사용량: {blockedQuota.used.toLocaleString()} / {(blockedQuota.limit + blockedQuota.bonus).toLocaleString()}
+          </p>
+          {quota?.pendingRequest ? (
+            <p className="hint">이미 충전 요청이 대기 중입니다. 관리자 승인을 기다려주세요.</p>
+          ) : (
+            <>
+              <label className="field">
+                <span>요청 사유 (선택)</span>
+                <input value={topUpNote} onChange={(e) => setTopUpNote(e.target.value)} placeholder="예: 이번 달 행사 공지 다수" />
+              </label>
+              <button className="btn btn-primary" onClick={handleRequestTopUp} disabled={requestingTopUp}>
+                {requestingTopUp ? "요청 중..." : "충전 요청하기"}
+              </button>
+            </>
+          )}
         </section>
       )}
 
