@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
   }
+  if (user.suspended) {
+    return NextResponse.json({ ok: false, error: "정지된 계정입니다." }, { status: 403 });
+  }
 
   const res = NextResponse.json({ ok: true, user: { username: user.username, role: user.role } });
   res.cookies.set(COOKIE_NAME, sessionCookieValue(user.id), {

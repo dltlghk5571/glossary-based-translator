@@ -43,7 +43,7 @@ class AnalyzeTextTests(unittest.TestCase):
     @patch("web_pipeline.build_generate_fns")
     def test_blocks_when_quota_exhausted(self, mock_generate_fns, mock_fetch, mock_get_quota):
         mock_fetch.return_value = GLOSSARY
-        mock_get_quota.return_value = {"limit": 1000, "used": 1000, "bonus": 0, "remaining": 0}
+        mock_get_quota.return_value = {"limit": 1000, "used": 1000, "bonus": 0, "remaining": 0, "suspended": False}
         generate_fns = stub_generate_fns()
         mock_generate_fns.return_value = generate_fns
 
@@ -51,6 +51,18 @@ class AnalyzeTextTests(unittest.TestCase):
             web_pipeline.analyze_text("중앙운영위원회", user_id=1)
 
         self.assertEqual(ctx.exception.quota["remaining"], 0)
+        mock_generate_fns.assert_not_called()
+
+    @patch("web_pipeline.db_users.get_quota")
+    @patch("web_pipeline.db_glossary.fetch_glossary_rows")
+    @patch("web_pipeline.build_generate_fns")
+    def test_blocks_when_suspended(self, mock_generate_fns, mock_fetch, mock_get_quota):
+        mock_fetch.return_value = GLOSSARY
+        mock_get_quota.return_value = {"limit": 1000, "used": 0, "bonus": 0, "remaining": 1000, "suspended": True}
+
+        with self.assertRaises(web_pipeline.AccountSuspendedError):
+            web_pipeline.analyze_text("중앙운영위원회", user_id=1)
+
         mock_generate_fns.assert_not_called()
 
     @patch("web_pipeline.db_users.get_quota")
@@ -71,7 +83,7 @@ class TranslateTextTests(unittest.TestCase):
     @patch("web_pipeline.build_generate_fns")
     @patch("web_pipeline.db_users.get_quota")
     def test_protects_and_restores_glossary_term(self, mock_get_quota, mock_generate_fns, mock_fetch, mock_insert):
-        mock_get_quota.return_value = {"limit": 1000, "used": 0, "bonus": 0, "remaining": 1000}
+        mock_get_quota.return_value = {"limit": 1000, "used": 0, "bonus": 0, "remaining": 1000, "suspended": False}
         mock_fetch.return_value = GLOSSARY
         mock_generate_fns.return_value = stub_generate_fns(
             translation_response="The __TERM_001__ met today."
@@ -110,9 +122,21 @@ class TranslateTextTests(unittest.TestCase):
     @patch("web_pipeline.build_generate_fns")
     def test_blocks_when_quota_exhausted(self, mock_generate_fns, mock_fetch, mock_get_quota):
         mock_fetch.return_value = GLOSSARY
-        mock_get_quota.return_value = {"limit": 1000, "used": 1000, "bonus": 0, "remaining": 0}
+        mock_get_quota.return_value = {"limit": 1000, "used": 1000, "bonus": 0, "remaining": 0, "suspended": False}
 
         with self.assertRaises(web_pipeline.QuotaExceededError):
+            web_pipeline.translate_text("중앙운영위원회는 오늘 회의를 열었다.", user_id=1)
+
+        mock_generate_fns.assert_not_called()
+
+    @patch("web_pipeline.db_users.get_quota")
+    @patch("web_pipeline.db_glossary.fetch_glossary_rows")
+    @patch("web_pipeline.build_generate_fns")
+    def test_blocks_when_suspended(self, mock_generate_fns, mock_fetch, mock_get_quota):
+        mock_fetch.return_value = GLOSSARY
+        mock_get_quota.return_value = {"limit": 1000, "used": 0, "bonus": 0, "remaining": 1000, "suspended": True}
+
+        with self.assertRaises(web_pipeline.AccountSuspendedError):
             web_pipeline.translate_text("중앙운영위원회는 오늘 회의를 열었다.", user_id=1)
 
         mock_generate_fns.assert_not_called()
@@ -126,7 +150,7 @@ class TranslateTextTests(unittest.TestCase):
         self, mock_generate_fns, mock_fetch, mock_insert, mock_get_quota, mock_record_usage
     ):
         mock_fetch.return_value = GLOSSARY
-        mock_get_quota.return_value = {"limit": 1000, "used": 0, "bonus": 0, "remaining": 1000}
+        mock_get_quota.return_value = {"limit": 1000, "used": 0, "bonus": 0, "remaining": 1000, "suspended": False}
 
         def fake_build_generate_fns(usage_tracker=None):
             if usage_tracker is not None:

@@ -81,5 +81,7 @@ class handler(BaseHTTPRequestHandler):
             send_json(self, 200, result)
         except web_pipeline.QuotaExceededError as e:
             send_json(self, 403, {"ok": False, "error": "quota_exceeded", "quota": e.quota})
+        except web_pipeline.AccountSuspendedError:
+            send_json(self, 403, {"ok": False, "error": "account_suspended"})
         except Exception as e:
             send_json(self, 500, {"ok": False, "error": str(e)})

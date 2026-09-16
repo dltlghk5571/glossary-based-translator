@@ -25,6 +25,11 @@ class QuotaExceededError(Exception):
         self.quota = quota
 
 
+class AccountSuspendedError(Exception):
+    def __init__(self):
+        super().__init__("This account is suspended.")
+
+
 def _detect_missing_terms(candidate_terms, glossary):
     missing = []
     seen_ko = set()
@@ -69,6 +74,8 @@ def analyze_text(text, user_id=None):
     missing ones for the user to fill in and approve (POST /api/glossary/approve)."""
     if user_id is not None:
         quota = db_users.get_quota(user_id)
+        if quota["suspended"]:
+            raise AccountSuspendedError()
         if quota["remaining"] <= 0:
             raise QuotaExceededError(quota)
 
@@ -102,6 +109,8 @@ def translate_text(text, user_id=None):
     applied, token usage, user_id) for the backoffice's audit trail."""
     if user_id is not None:
         quota = db_users.get_quota(user_id)
+        if quota["suspended"]:
+            raise AccountSuspendedError()
         if quota["remaining"] <= 0:
             raise QuotaExceededError(quota)
 

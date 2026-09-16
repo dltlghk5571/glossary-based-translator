@@ -42,15 +42,34 @@ class GetQuotaTests(unittest.TestCase):
         row = {
             "monthlyTokenLimit": 100000, "tokensUsedThisPeriod": 4000,
             "bonusTokens": 500, "periodStart": datetime(2026, 9, 1, tzinfo=timezone.utc),
+            "suspended": False,
         }
         conn, cur = _fake_connection(row)
         mock_get_conn.return_value = conn
 
         result = db_users.get_quota(user_id=1, now=now)
 
-        self.assertEqual(result, {"limit": 100000, "used": 4000, "bonus": 500, "remaining": 96500})
+        self.assertEqual(
+            result,
+            {"limit": 100000, "used": 4000, "bonus": 500, "remaining": 96500, "suspended": False},
+        )
         # no reset UPDATE should have been issued -- only the SELECT
         self.assertEqual(cur.execute.call_count, 1)
+
+    @patch("db_users.get_connection")
+    def test_returns_suspended_flag(self, mock_get_conn):
+        now = datetime(2026, 9, 15, tzinfo=timezone.utc)
+        row = {
+            "monthlyTokenLimit": 100000, "tokensUsedThisPeriod": 4000,
+            "bonusTokens": 500, "periodStart": datetime(2026, 9, 1, tzinfo=timezone.utc),
+            "suspended": True,
+        }
+        conn, cur = _fake_connection(row)
+        mock_get_conn.return_value = conn
+
+        result = db_users.get_quota(user_id=1, now=now)
+
+        self.assertTrue(result["suspended"])
 
     @patch("db_users.get_connection")
     def test_rollover_resets_used_and_bonus(self, mock_get_conn):
@@ -58,13 +77,17 @@ class GetQuotaTests(unittest.TestCase):
         row = {
             "monthlyTokenLimit": 100000, "tokensUsedThisPeriod": 99000,
             "bonusTokens": 5000, "periodStart": datetime(2026, 8, 20, tzinfo=timezone.utc),
+            "suspended": False,
         }
         conn, cur = _fake_connection(row)
         mock_get_conn.return_value = conn
 
         result = db_users.get_quota(user_id=1, now=now)
 
-        self.assertEqual(result, {"limit": 100000, "used": 0, "bonus": 0, "remaining": 100000})
+        self.assertEqual(
+            result,
+            {"limit": 100000, "used": 0, "bonus": 0, "remaining": 100000, "suspended": False},
+        )
         # SELECT + the reset UPDATE
         self.assertEqual(cur.execute.call_count, 2)
         conn.commit.assert_called_once()
@@ -85,6 +108,7 @@ class RecordUsageTests(unittest.TestCase):
         row = {
             "monthlyTokenLimit": 100000, "tokensUsedThisPeriod": 1000,
             "bonusTokens": 0, "periodStart": datetime(2026, 9, 1, tzinfo=timezone.utc),
+            "suspended": False,
         }
         conn, cur = _fake_connection(row)
         mock_get_conn.return_value = conn
@@ -102,6 +126,7 @@ class RecordUsageTests(unittest.TestCase):
         row = {
             "monthlyTokenLimit": 100000, "tokensUsedThisPeriod": 1000,
             "bonusTokens": 0, "periodStart": datetime(2026, 9, 1, tzinfo=timezone.utc),
+            "suspended": False,
         }
         conn, cur = _fake_connection(row)
         mock_get_conn.return_value = conn

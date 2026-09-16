@@ -66,7 +66,11 @@ export function canEditGlossary(user: SessionUser | null): boolean {
 export async function getSessionUser(cookieValue: string | undefined): Promise<SessionUser | null> {
   const userId = verifiedUserId(cookieValue);
   if (userId === null) return null;
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true, role: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true, role: true, suspended: true },
+  });
+  if (!user || user.suspended) return null;
   return user;
 }
 

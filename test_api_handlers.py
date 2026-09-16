@@ -105,6 +105,14 @@ class AnalyzeRouteTests(_HandlerServerTestCase):
         self.assertEqual(data["quota"]["remaining"], 0)
 
     @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
+    @patch("index.web_pipeline.analyze_text")
+    def test_account_suspended_becomes_403(self, mock_analyze):
+        mock_analyze.side_effect = index_module.web_pipeline.AccountSuspendedError()
+        status, data = self.post("/api/analyze", {"text": "안녕하세요"}, headers=session_cookie(1))
+        self.assertEqual(status, 403)
+        self.assertEqual(data["error"], "account_suspended")
+
+    @patch.dict(os.environ, {"SESSION_SECRET": TEST_SECRET})
     def test_unauthorized_without_session_cookie(self):
         status, data = self.post("/api/analyze", {"text": "안녕하세요"})
         self.assertEqual(status, 401)

@@ -20,13 +20,13 @@ def _compute_remaining(limit, bonus, used):
 
 
 def get_quota(user_id, now=None):
-    """Returns {"limit", "used", "bonus", "remaining"}, applying the lazy
-    monthly reset first if the stored period has rolled over."""
+    """Returns {"limit", "used", "bonus", "remaining", "suspended"}, applying
+    the lazy monthly reset first if the stored period has rolled over."""
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                'SELECT "monthlyTokenLimit", "tokensUsedThisPeriod", "bonusTokens", "periodStart" '
+                'SELECT "monthlyTokenLimit", "tokensUsedThisPeriod", "bonusTokens", "periodStart", "suspended" '
                 'FROM "User" WHERE id = %s',
                 [user_id],
             )
@@ -48,7 +48,11 @@ def get_quota(user_id, now=None):
                 )
                 conn.commit()
 
-            return {"limit": limit, "used": used, "bonus": bonus, "remaining": _compute_remaining(limit, bonus, used)}
+            return {
+                "limit": limit, "used": used, "bonus": bonus,
+                "remaining": _compute_remaining(limit, bonus, used),
+                "suspended": row["suspended"],
+            }
 
 
 def record_usage(user_id, input_tokens, output_tokens, now=None):

@@ -39,15 +39,40 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   return NextResponse.json({ ok: true });
 }
 
-// Reset a user's password to a freshly generated one, returned once.
+// Body {suspended: boolean} toggles suspension; no body (or no `suspended` key)
+// resets the user's password to a freshly generated one, returned once.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await requireAdmin(request))) {
+  const admin = await requireAdmin(request);
+  if (!admin) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const id = Number.parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
     return NextResponse.json({ ok: false, error: "invalid user id" }, { status: 400 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  if (typeof body.suspended === "boolean") {
+    if (id === admin.id) {
+      return NextResponse.json({ ok: false, error: "cannot suspend your own account" }, { status: 400 });
+    }
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) {
+      return NextResponse.json({ ok: false, error: "user not found" }, { status: 404 });
+    }
+    if (body.suspended && target.role === "admin") {
+      const activeAdminCount = await prisma.user.count({ where: { role: "admin", suspended: false } });
+      if (activeAdminCount <= 1) {
+        return NextResponse.json({ ok: false, error: "cannot suspend the last active admin account" }, { status: 400 });
+      }
+    }
+    const user = await prisma.user.update({
+      where: { id },
+      data: { suspended: body.suspended },
+      select: { id: true, username: true, role: true, suspended: true, createdAt: true },
+    });
+    return NextResponse.json({ ok: true, user });
   }
 
   const password = generatePassword();

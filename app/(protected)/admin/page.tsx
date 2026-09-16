@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { adminListQuotas, adminListTopUps, adminResolveTopUp, adminUpdateQuotaLimit } from "@/lib/api";
 import type { OrgQuota, TopUpRequest } from "@/lib/types";
 
-type AdminUser = { id: number; username: string; role: string; createdAt: string };
+type AdminUser = { id: number; username: string; role: string; suspended: boolean; createdAt: string };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -97,6 +97,17 @@ export default function AdminPage() {
     }
   }
 
+  async function handleToggleSuspend(id: number, username: string, suspend: boolean) {
+    if (suspend && !confirm(`Suspend account "${username}"? They'll be signed out immediately.`)) return;
+    setError("");
+    try {
+      await request(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ suspended: suspend }) });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update suspension status");
+    }
+  }
+
   async function handleUpdateLimit(userId: number, monthlyTokenLimit: number) {
     setError("");
     try {
@@ -178,6 +189,7 @@ export default function AdminPage() {
                 <tr>
                   <th>Username</th>
                   <th>Role</th>
+                  <th>Status</th>
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -189,12 +201,24 @@ export default function AdminPage() {
                     <td>
                       <span className={`badge ${u.role === "admin" ? "badge-admin" : ""}`}>{u.role}</span>
                     </td>
+                    <td>
+                      {u.suspended ? <span className="badge badge-deprecated">suspended</span> : <span className="hint">active</span>}
+                    </td>
                     <td className="hint">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td>
                       <div className="btn-row">
                         <button className="btn btn-sm" onClick={() => handleResetPassword(u.id)}>
                           Reset password
                         </button>
+                        {u.suspended ? (
+                          <button className="btn btn-sm" onClick={() => handleToggleSuspend(u.id, u.username, false)}>
+                            Unsuspend
+                          </button>
+                        ) : (
+                          <button className="btn btn-sm btn-danger" onClick={() => handleToggleSuspend(u.id, u.username, true)}>
+                            Suspend
+                          </button>
+                        )}
                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(u.id, u.username)}>
                           Delete
                         </button>
