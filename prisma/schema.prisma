@@ -94,7 +94,7 @@ model TranslationHistory {
 model TokenTopUpRequest {
   id            Int       @id @default(autoincrement())
   userId        Int
-  user          User      @relation(fields: [userId], references: [id])
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   status        String    @default("pending") // pending | approved | denied
   grantedTokens Int?
   note          String    @default("")

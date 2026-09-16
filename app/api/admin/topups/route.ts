@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getQuotaSnapshot } from "@/lib/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(grantedTokens) || grantedTokens <= 0) {
       return NextResponse.json({ ok: false, error: "grantedTokens must be a positive integer" }, { status: 400 });
     }
+    await getQuotaSnapshot(existing.userId); // apply lazy monthly reset first so the increment below lands in the live period
     await prisma.$transaction([
       prisma.tokenTopUpRequest.update({
         where: { id },
