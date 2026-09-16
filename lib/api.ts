@@ -1,4 +1,12 @@
-import type { AnalyzeResult, GlossaryTerm, TranslateResult } from "./types";
+import type { AnalyzeResult, GlossaryTerm, OrgQuota, QuotaInfo, TopUpRequest, TranslateResult } from "./types";
+
+export class QuotaExceededClientError extends Error {
+  quota: { limit: number; used: number; bonus: number; remaining: number };
+  constructor(quota: { limit: number; used: number; bonus: number; remaining: number }) {
+    super("한도를 초과했습니다.");
+    this.quota = quota;
+  }
+}
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -22,8 +30,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const message = (data as { error?: string } | null)?.error;
-    throw new Error(message || `요청이 실패했습니다 (HTTP ${res.status}). 잠시 후 다시 시도해주세요.`);
+    const errorBody = data as { error?: string; quota?: { limit: number; used: number; bonus: number; remaining: number } } | null;
+    if (res.status === 403 && errorBody?.error === "quota_exceeded" && errorBody.quota) {
+      throw new QuotaExceededClientError(errorBody.quota);
+    }
+    throw new Error(errorBody?.error || `요청이 실패했습니다 (HTTP ${res.status}). 잠시 후 다시 시도해주세요.`);
   }
   if (data === null) {
     throw new Error("서버 응답을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.");
@@ -77,4 +88,37 @@ export function updateGlossaryTerm(id: number, fields: Partial<GlossaryTerm>) {
 
 export function deleteGlossaryTerm(id: number) {
   return request<{ ok: true }>(`/api/glossary/${id}`, { method: "DELETE" });
+}
+
+export function getQuota() {
+  return request<{ ok: true } & QuotaInfo>("/api/quota");
+}
+
+export function requestTopUp(note: string) {
+  return request<{ ok: true; topUp: { id: number } }>("/api/quota/topup-request", {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function adminListQuotas() {
+  return request<{ ok: true; orgs: OrgQuota[] }>("/api/admin/quota");
+}
+
+export function adminUpdateQuotaLimit(userId: number, monthlyTokenLimit: number) {
+  return request<{ ok: true; org: OrgQuota }>("/api/admin/quota", {
+    method: "PATCH",
+    body: JSON.stringify({ userId, monthlyTokenLimit }),
+  });
+}
+
+export function adminListTopUps() {
+  return request<{ ok: true; requests: TopUpRequest[] }>("/api/admin/topups");
+}
+
+export function adminResolveTopUp(id: number, action: "approve" | "deny", grantedTokens?: number) {
+  return request<{ ok: true }>("/api/admin/topups", {
+    method: "POST",
+    body: JSON.stringify({ id, action, grantedTokens }),
+  });
 }

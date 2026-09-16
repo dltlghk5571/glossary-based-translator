@@ -57,3 +57,29 @@ export type GlossaryTerm = {
 };
 
 export type GlossaryStatus = "approved" | "pending_reference" | "deprecated";
+
+export type QuotaInfo = {
+  limit: number;
+  used: number;
+  bonus: number;
+  remaining: number;
+  pendingRequest: boolean;
+};
+
+export type OrgQuota = {
+  id: number;
+  username: string;
+  monthlyTokenLimit: number;
+  tokensUsedThisPeriod: number;
+  bonusTokens: number;
+};
+
+export type TopUpRequest = {
+  id: number;
+  userId: number;
+  status: string;
+  grantedTokens: number | null;
+  note: string;
+  createdAt: string;
+  user: { username: string };
+};
