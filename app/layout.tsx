@@ -25,6 +25,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <a className="nav-link" href="/glossary">
               Glossary
             </a>
+            <a className="nav-link" href="/history">
+              History
+            </a>
             {user.role === "admin" && (
               <a className="nav-link" href="/admin">
                 Admin

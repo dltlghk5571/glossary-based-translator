@@ -74,6 +74,13 @@ export type OrgQuota = {
   bonusTokens: number;
 };
 
+export type TranslationHistoryEntry = {
+  id: number;
+  sourceText: string;
+  translatedText: string;
+  createdAt: string;
+};
+
 export type TopUpRequest = {
   id: number;
   userId: number;

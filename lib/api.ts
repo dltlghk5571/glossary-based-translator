@@ -1,4 +1,4 @@
-import type { AnalyzeResult, GlossaryTerm, OrgQuota, QuotaInfo, TopUpRequest, TranslateResult } from "./types";
+import type { AnalyzeResult, GlossaryTerm, OrgQuota, QuotaInfo, TopUpRequest, TranslateResult, TranslationHistoryEntry } from "./types";
 
 export class QuotaExceededClientError extends Error {
   quota: { limit: number; used: number; bonus: number; remaining: number };
@@ -121,4 +121,8 @@ export function adminResolveTopUp(id: number, action: "approve" | "deny", grante
     method: "POST",
     body: JSON.stringify({ id, action, grantedTokens }),
   });
+}
+
+export function listHistory() {
+  return request<{ ok: true; translations: TranslationHistoryEntry[] }>("/api/history");
 }
