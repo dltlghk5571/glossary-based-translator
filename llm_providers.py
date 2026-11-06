@@ -24,6 +24,14 @@ TASK_DEFAULT_PROVIDER = {
     "repair": "anthropic",
 }
 
+# Per-task overrides for the anthropic provider. translation gets a lower
+# effort since it needs instruction-following, not deep reasoning. Haiku 4.5
+# was tried for term_extraction but its candidate-term judgment was noisier
+# than Sonnet 5's (see eval run 2026-09-15) -- reverted.
+TASK_ANTHROPIC_KWARGS = {
+    "translation": {"effort": "medium"},
+}
+
 
 def _require_key(env_var):
     key = os.environ.get(env_var)
@@ -36,13 +44,14 @@ def _require_key(env_var):
     return key
 
 
-def call_anthropic(prompt, model=None):
+def call_anthropic(prompt, model=None, effort=None):
     """Returns (text, usage) where usage is {"input_tokens", "output_tokens"}."""
     import anthropic
     client = anthropic.Anthropic(api_key=_require_key("ANTHROPIC_API_KEY"))
     response = client.messages.create(
         model=model or os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODELS["anthropic"]),
         max_tokens=8000,
+        output_config={"effort": effort} if effort else anthropic.NOT_GIVEN,
         messages=[{"role": "user", "content": prompt}],
     )
     text = ""
@@ -121,9 +130,10 @@ def get_generate_fn(task, usage_tracker=None):
             f"Choose one of: {', '.join(PROVIDER_FUNCS)}"
         )
     call_fn = PROVIDER_FUNCS[provider]
+    task_kwargs = TASK_ANTHROPIC_KWARGS.get(task, {}) if provider == "anthropic" else {}
 
     def generate(prompt):
-        text, usage = _with_retry(call_fn, prompt)
+        text, usage = _with_retry(lambda p: call_fn(p, **task_kwargs), prompt)
         if usage_tracker is not None:
             usage_tracker["input_tokens"] = usage_tracker.get("input_tokens", 0) + usage.get("input_tokens", 0)
             usage_tracker["output_tokens"] = usage_tracker.get("output_tokens", 0) + usage.get("output_tokens", 0)

@@ -50,7 +50,9 @@ translation/repair (glossary terms and `__TERM_NNN__` placeholders must come bac
 unchanged, never paraphrased), at roughly 40% of Opus-tier cost — plenty of quality headroom for
 this task. A key is only required for the provider actually selected for each step — the CLI
 exits with a clear error naming the missing variable if you select a provider whose key isn't
-set. Override the model within a provider via `ANTHROPIC_MODEL` / `OPENAI_MODEL` / `GOOGLE_MODEL`
+set. On Anthropic, the translation step runs at `effort: "medium"` (per-task settings live in
+`TASK_ANTHROPIC_KWARGS` in `llm_providers.py`); term extraction and repair use the model default.
+Override the model within a provider via `ANTHROPIC_MODEL` / `OPENAI_MODEL` / `GOOGLE_MODEL`
 (e.g. `ANTHROPIC_MODEL=claude-opus-4-8` for maximum quality, or `claude-haiku-4-5` for lowest cost).
 
 Override any step independently:

@@ -282,5 +282,27 @@ class AuditTests(unittest.TestCase):
         self.assertTrue(any("unresolved" in i for i in issues))
 
 
+class ProviderKwargsTests(unittest.TestCase):
+    def test_anthropic_effort_only_on_translation(self):
+        from unittest import mock
+        import llm_providers as lp
+
+        seen = {}
+
+        def fake_anthropic(prompt, **kw):
+            seen[prompt] = kw
+            return "ok", {}
+
+        with mock.patch.dict(lp.PROVIDER_FUNCS, {"anthropic": fake_anthropic}), \
+                mock.patch.dict(os.environ, {}, clear=False):
+            for task in lp.TASK_DEFAULT_PROVIDER:
+                os.environ.pop(f"{task.upper()}_PROVIDER", None)
+                lp.get_generate_fn(task)(task)
+
+        self.assertEqual(seen["translation"], {"effort": "medium"})
+        self.assertEqual(seen["term_extraction"], {})
+        self.assertEqual(seen["repair"], {})
+
+
 if __name__ == "__main__":
     unittest.main()
