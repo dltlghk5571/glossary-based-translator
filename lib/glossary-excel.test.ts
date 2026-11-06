@@ -26,11 +26,7 @@ async function codeOf(p: Promise<unknown>): Promise<string> {
 
 test("the template reads back as exactly its example rows", async () => {
   const rows = await readUploadRows(await buildTemplate(LABELS, EXAMPLES));
-  assert.deepEqual(
-    rows.map(({ rowNumber, ...r }) => r),
-    EXAMPLES
-  );
-  assert.deepEqual(rows.map((r) => r.rowNumber), [3, 4, 5]);
+  assert.deepEqual(rows, EXAMPLES.map((e, i) => ({ rowNumber: i + 3, ...e })));
 });
 
 test("the template has the guide sheet and a 분류 dropdown", async () => {
