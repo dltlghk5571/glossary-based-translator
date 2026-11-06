@@ -157,7 +157,7 @@ export default function TranslatePage() {
         <section className="card" style={{ marginTop: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 15 }}>Missing Glossary Terms ({analyzeResult.missing_terms.length})</h2>
           <p className="hint">번역 전에 아래 용어의 공식 영문 번역을 확인/입력하고 저장하면 이어서 번역이 진행됩니다.</p>
-          <p className="hint">저장된 용어는 &quot;pending_reference&quot; 상태로 등록되며, 관리자/편집자가 글로서리 페이지에서 검토 후 승인합니다.</p>
+          <p className="hint">저장된 용어는 검수자의 제안함으로 보내지며, 검수자가 승인하면 용어집에 반영됩니다.</p>
           <div className="table-wrap">
             <table className="table">
               <thead>

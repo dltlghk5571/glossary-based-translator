@@ -1,4 +1,5 @@
-import type { AnalyzeResult, GlossaryTerm, OrgQuota, QuotaInfo, TopUpRequest, TranslateResult, TranslationHistoryEntry } from "./types";
+import type { AnalyzeResult, GlossaryTerm, OrgQuota, QuotaInfo, TopUpRequest, TranslateResult, TranslationHistoryEntry, UploadPreviewResponse, SuggestionItem } from "./types";
+import type { Decision } from "./glossary-import";
 
 export class QuotaExceededClientError extends Error {
   quota: { limit: number; used: number; bonus: number; remaining: number };
@@ -13,7 +14,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(url, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      // FormData bodies need the browser's own multipart Content-Type (with boundary).
+      headers: init?.body instanceof FormData ? init.headers : { "Content-Type": "application/json", ...(init?.headers || {}) },
     });
   } catch {
     throw new Error("서버에 연결할 수 없습니다. 네트워크 상태를 확인하고 다시 시도해주세요.");
@@ -63,10 +65,10 @@ export function approveTerm(term: Partial<GlossaryTerm>) {
   });
 }
 
-// Used from the translate flow -- always lands as "pending_reference",
-// regardless of any status the caller passes in.
+// Used from the translate flow -- lands in the reviewers' 제안함 as a pending
+// suggestion; never changes the glossary itself.
 export function suggestTerm(term: Partial<GlossaryTerm>) {
-  return request<{ ok: true; term: GlossaryTerm }>("/api/glossary/suggest", {
+  return request<{ ok: true; suggestion: { id: number } }>("/api/glossary/suggest", {
     method: "POST",
     body: JSON.stringify(term),
   });
@@ -125,4 +127,33 @@ export function adminResolveTopUp(id: number, action: "approve" | "deny", grante
 
 export function listHistory() {
   return request<{ ok: true; translations: TranslationHistoryEntry[] }>("/api/history");
+}
+
+function uploadForm(file: File, decisions?: Record<string, Decision>) {
+  const form = new FormData();
+  form.set("file", file);
+  if (decisions) form.set("decisions", JSON.stringify(decisions));
+  return form;
+}
+
+export function previewGlossaryUpload(file: File) {
+  return request<UploadPreviewResponse>("/api/glossary/import/preview", { method: "POST", body: uploadForm(file) });
+}
+
+export function applyGlossaryUpload(file: File, decisions: Record<string, Decision>) {
+  return request<
+    | { ok: true; mode: "applied"; counts: { added: number; replaced: number; kept: number; excluded: number } }
+    | { ok: true; mode: "suggested"; counts: { suggested: number; excluded: number } }
+  >("/api/glossary/import/apply", { method: "POST", body: uploadForm(file, decisions) });
+}
+
+export function listSuggestions() {
+  return request<{ ok: true; suggestions: SuggestionItem[] }>("/api/glossary/suggestions");
+}
+
+export function decideSuggestion(id: number, action: "accept" | "reject", decisions?: Record<string, Decision>) {
+  return request<{ ok: true; result: "accepted" | "rejected" }>(`/api/glossary/suggestions/${id}`, {
+    method: "POST",
+    body: JSON.stringify({ action, decisions }),
+  });
 }

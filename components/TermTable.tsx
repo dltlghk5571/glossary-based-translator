@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { deleteGlossaryTerm, updateGlossaryTerm } from "@/lib/api";
 import type { GlossaryTerm } from "@/lib/types";
+import { GLOSSARY_TYPES } from "@/lib/glossary-import";
 
-const TYPES = ["General", "Organization", "Regulation", "Role/Position", "Election", "Finance", "Meeting/Procedure", "Academic"];
+const TYPES = GLOSSARY_TYPES.map((t) => t.value);
 
 export default function TermTable({
   terms,

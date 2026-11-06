@@ -1,3 +1,5 @@
+import type { Collision, ExistingTerm, UploadPreview } from "./glossary-import";
+
 export type CandidateTerm = {
   ko_term: string;
   type?: string;
@@ -89,4 +91,26 @@ export type TopUpRequest = {
   note: string;
   createdAt: string;
   user: { username: string };
+};
+
+// Preview overlaps carry the existing terms they collide with, so the UI can
+// show existing vs uploaded values side by side.
+export type UploadPreviewResponse = {
+  ok: true;
+  preview: Omit<UploadPreview, "overlaps"> & { overlaps: (UploadPreview["overlaps"][number] & { existing: ExistingTerm[] })[] };
+  canApply: boolean;
+};
+
+export type SuggestionItem = {
+  id: number;
+  korean: string;
+  english: string;
+  type: string;
+  aliases: string;
+  usageNote: string;
+  source: "excel" | "translation_flow";
+  createdAt: string;
+  username: string;
+  collisions: Collision[];
+  existing: ExistingTerm[];
 };

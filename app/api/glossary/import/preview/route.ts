@@ -14,8 +14,13 @@ export async function POST(request: NextRequest) {
   }
   try {
     const rows = await readUploadFromForm(await request.formData());
-    const preview = classifyUpload(rows, await loadExistingTerms());
-    return NextResponse.json({ ok: true, preview, canApply: canEditGlossary(user) });
+    const existing = await loadExistingTerms();
+    const preview = classifyUpload(rows, existing);
+    const overlaps = preview.overlaps.map((o) => {
+      const ids = new Set(o.collisions.map((c) => c.termId));
+      return { ...o, existing: existing.filter((t) => ids.has(t.id)) };
+    });
+    return NextResponse.json({ ok: true, preview: { ...preview, overlaps }, canApply: canEditGlossary(user) });
   } catch (err) {
     const mapped = uploadErrorResponse(err);
     if (mapped) return NextResponse.json(mapped.body, { status: mapped.status });

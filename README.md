@@ -165,7 +165,7 @@ npm run test:integration  # see below -- needs TEST_DATABASE_URL
 
 **`npm run test:integration`** (`test/glossary-flow.integration.test.ts`) is an E2E-style
 integration test: it spawns a real `next dev` server and drives it over real HTTP with forged
-session cookies, exercising the actual `/api/glossary/approve` and `/api/glossary/suggest` route
+session cookies, exercising the actual `/api/glossary/approve`, `/api/glossary/suggest`, Excel import and 제안함 route
 handlers and a real Postgres.
 
 - **Never run it against a production or shared dev database.** It requires `TEST_DATABASE_URL`
@@ -222,6 +222,24 @@ provider's usage field (`llm_providers.py`'s `call_anthropic`/`call_openai`/`cal
 return `(text, usage)`; `get_generate_fn`'s public `generate(prompt) -> str` signature is
 unchanged, so the CLI and every other caller are unaffected -- only a caller that passes a
 `usage_tracker` dict to `build_generate_fns()` sees token counts).
+
+**Glossary Excel upload and 제안함.** The glossary page has an "엑셀로 올리기" panel for every
+user. "템플릿 받기" (`GET /api/glossary/template`) downloads `glossary_template.xlsx`: sheet
+`용어집` with `한국어 용어`/`영어 번역` required and `분류`/`다른 표기`/`사용 메모` optional, plus
+a `작성 방법` guide sheet. An upload is previewed first (`/api/glossary/import/preview`) as new
+terms, overlapping terms and problem rows. Overlap means the same Korean term, or any surface
+form (term or alias) already used by another term. Applying (`/api/glossary/import/apply`)
+depends on the role:
+- **Reviewers** (`admin`/`editor`) write straight to `Glossary` as `approved`. For each overlap
+  they choose 기존 유지 (the default) or 엑셀로 바꾸기. A blank cell never overwrites an existing
+  value.
+- **Regular users** never change `Glossary`. Their rows become pending `GlossarySuggestion` rows,
+  and reviewers accept or reject them in 제안함 on the same page.
+
+Translate-flow term suggestions (`/api/glossary/suggest`) also land in 제안함 and no longer create
+or overwrite `Glossary` rows. The analyzer doesn't ask again about a term that has a pending
+suggestion. Decision logic lives in `lib/glossary-import.ts` and is unit-tested. Limits: `.xlsx`
+only, 2 MB, 2,000 rows.
 
 ### Local dev
 

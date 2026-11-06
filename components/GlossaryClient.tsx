@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { approveTerm, listGlossary } from "@/lib/api";
 import type { GlossaryTerm } from "@/lib/types";
+import { GLOSSARY_TYPES } from "@/lib/glossary-import";
 import TermTable from "@/components/TermTable";
+import GlossaryUpload from "@/components/GlossaryUpload";
+import SuggestionBox from "@/components/SuggestionBox";
 
-const TYPES = ["General", "Organization", "Regulation", "Role/Position", "Election", "Finance", "Meeting/Procedure", "Academic"];
+const TYPES = GLOSSARY_TYPES.map((t) => t.value);
 
 function emptyNewTerm() {
   return { korean: "", english: "", type: "General", aliases: "", status: "approved" };
@@ -19,6 +22,7 @@ export default function GlossaryClient({ canEdit }: { canEdit: boolean }) {
   const [error, setError] = useState("");
   const [newTerm, setNewTerm] = useState(emptyNewTerm());
   const [adding, setAdding] = useState(false);
+  const [suggestionsKey, setSuggestionsKey] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -113,6 +117,15 @@ export default function GlossaryClient({ canEdit }: { canEdit: boolean }) {
           </button>
         </div>
       </section>
+
+      <GlossaryUpload
+        onApplied={() => {
+          load();
+          setSuggestionsKey((k) => k + 1);
+        }}
+      />
+
+      {canEdit && <SuggestionBox reloadKey={suggestionsKey} onDecided={load} />}
 
       {canEdit && (
         <section className="card" style={{ marginTop: 16 }}>
