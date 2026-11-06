@@ -37,6 +37,28 @@ model Glossary {
   @@index([status])
 }
 
+// Regular-user and translate-flow suggestions waiting for a reviewer.
+// Never read by the translation matcher; a reviewer accepting one writes Glossary.
+model GlossarySuggestion {
+  id           Int       @id @default(autoincrement())
+  korean       String
+  english      String
+  type         String    @default("General")
+  aliases      String    @default("")
+  usageNote    String    @default("")
+  lastContext  String    @default("")
+  source       String // "excel" | "translation_flow"
+  status       String    @default("pending") // "pending" | "accepted" | "rejected"
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedById Int?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([status])
+  @@index([korean])
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique
@@ -53,6 +75,7 @@ model User {
 
   topUpRequests TokenTopUpRequest[]
   translations  Translation[]
+  glossarySuggestions GlossarySuggestion[]
 
   @@index([role])
 }
