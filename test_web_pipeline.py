@@ -188,3 +188,19 @@ class TranslateTextTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PendingSuggestionFetchTests(unittest.TestCase):
+    def test_missing_table_means_no_pending_suggestions(self):
+        """Code deployed before the GlossarySuggestion migration must not break analyze."""
+        import psycopg
+        import db_glossary
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        cursor.execute.side_effect = psycopg.errors.UndefinedTable('relation "GlossarySuggestion" does not exist')
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+        with patch("db_glossary.get_connection") as mock_conn:
+            mock_conn.return_value.__enter__.return_value = conn
+            self.assertEqual(db_glossary.fetch_pending_suggestion_koreans(), set())

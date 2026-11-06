@@ -151,9 +151,16 @@ export function listSuggestions() {
   return request<{ ok: true; suggestions: SuggestionItem[] }>("/api/glossary/suggestions");
 }
 
-export function decideSuggestion(id: number, action: "accept" | "reject", decisions?: Record<string, Decision>) {
+// `seenCollisions`: the collision keys shown to the reviewer -- the server
+// refuses (409 collisions_changed) if it now finds one they didn't see.
+export function decideSuggestion(
+  id: number,
+  action: "accept" | "reject",
+  decisions: Record<string, Decision> | undefined,
+  seenCollisions: string[]
+) {
   return request<{ ok: true; result: "accepted" | "rejected" }>(`/api/glossary/suggestions/${id}`, {
     method: "POST",
-    body: JSON.stringify({ action, decisions }),
+    body: JSON.stringify({ action, decisions, seenCollisions }),
   });
 }

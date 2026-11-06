@@ -64,7 +64,7 @@ export async function upsertPendingSuggestion(
 ) {
   const data = {
     english: row.english,
-    type: row.type || "General",
+    type: row.type, // "" stays "" so a reviewer's 바꾸기 never resets the existing type
     aliases: row.aliases,
     usageNote: row.usageNote,
     lastContext,

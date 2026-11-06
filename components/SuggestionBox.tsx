@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { decideSuggestion, listSuggestions } from "@/lib/api";
-import type { Decision } from "@/lib/glossary-import";
+import { collisionKey, type Decision } from "@/lib/glossary-import";
 import type { SuggestionItem } from "@/lib/types";
 import CollisionChoices, { typeLabel } from "@/components/CollisionChoices";
 
@@ -32,12 +32,16 @@ export default function SuggestionBox({ reloadKey, onDecided }: { reloadKey: num
     setBusyId(item.id);
     setError("");
     try {
-      await decideSuggestion(item.id, action, decisions[item.id]);
+      await decideSuggestion(item.id, action, decisions[item.id], item.collisions.map(collisionKey));
       await load();
       onDecided();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setError(msg === "surface_conflict" ? "다른 사람이 방금 용어집을 바꿨습니다. 다시 확인해주세요" : msg);
+      setError(
+        msg === "surface_conflict" || msg === "collisions_changed"
+          ? "다른 사람이 방금 용어집을 바꿨습니다. 바뀐 내용을 확인하고 다시 골라주세요"
+          : msg
+      );
       await load();
     } finally {
       setBusyId(null);
@@ -57,7 +61,7 @@ export default function SuggestionBox({ reloadKey, onDecided }: { reloadKey: num
               <div>
                 <strong>{item.korean}</strong> → {item.english}{" "}
                 <span className="hint">
-                  ({typeLabel(item.type)}
+                  ({item.type ? typeLabel(item.type) : "분류 없음"}
                   {item.aliases && `, 다른 표기: ${item.aliases}`}) · {item.username} ·{" "}
                   {new Date(item.createdAt).toLocaleDateString("ko-KR")} · {SOURCE_LABEL[item.source]}
                 </span>

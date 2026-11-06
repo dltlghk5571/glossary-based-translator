@@ -51,6 +51,7 @@ export type UploadPreview = {
   newRows: NormalizedRow[];
   overlaps: { row: NormalizedRow; collisions: Collision[] }[];
   problems: { rowNumber: number; korean: string; reasons: ProblemReason[] }[];
+  skippedExamples: number; // untouched template example rows, shown so nothing vanishes silently
 };
 
 export const TEMPLATE_EXAMPLES: readonly UploadRow[] = [
@@ -104,12 +105,18 @@ function isBlank(r: UploadRow): boolean {
   return !r.korean && !r.english && !r.type && !r.aliases && !r.usageNote;
 }
 
+// Only an exact, untouched copy of an example row counts -- a real 회장/President
+// with any other field filled in is a genuine term.
 function isExample(r: UploadRow): boolean {
-  return TEMPLATE_EXAMPLES.some((e) => e.korean === r.korean && e.english === r.english);
+  return TEMPLATE_EXAMPLES.some(
+    (e) =>
+      e.korean === r.korean && e.english === r.english && e.type === r.type && e.aliases === r.aliases && e.usageNote === r.usageNote
+  );
 }
 
 export function classifyUpload(rows: UploadRow[], existing: ExistingTerm[]): UploadPreview {
-  const kept = rows.filter((r) => !isBlank(r) && !isExample(r));
+  const nonBlank = rows.filter((r) => !isBlank(r));
+  const kept = nonBlank.filter((r) => !isExample(r));
 
   // Which rows share a surface form with another row in the same file.
   const surfaceRows = new Map<string, Set<number>>();
@@ -124,7 +131,7 @@ export function classifyUpload(rows: UploadRow[], existing: ExistingTerm[]): Upl
     if (idxs.size > 1) idxs.forEach((i) => duplicated.add(i));
   }
 
-  const preview: UploadPreview = { newRows: [], overlaps: [], problems: [] };
+  const preview: UploadPreview = { newRows: [], overlaps: [], problems: [], skippedExamples: nonBlank.length - kept.length };
   kept.forEach((r, i) => {
     const reasons: ProblemReason[] = [];
     if (!r.korean) reasons.push("missing_korean");

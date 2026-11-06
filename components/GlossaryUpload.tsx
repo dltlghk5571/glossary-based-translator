@@ -104,6 +104,9 @@ export default function GlossaryUpload({ onApplied }: { onApplied: () => void })
         <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
           <p style={{ margin: 0 }}>
             새 용어 {p.newRows.length} · 겹치는 용어 {p.overlaps.length} · 문제 있는 행 {p.problems.length}
+            {p.skippedExamples > 0 && (
+              <span className="hint"> · 템플릿 예시 {p.skippedExamples}행은 건너뜀 (예시를 그대로 쓰려면 내용을 조금이라도 바꾸세요)</span>
+            )}
           </p>
 
           {p.newRows.length > 0 && (

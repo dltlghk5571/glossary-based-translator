@@ -143,3 +143,16 @@ test("a blank 분류 stays blank so replacing never resets the existing type", (
   if (plan.kind === "skip") return;
   assert.equal("type" in plan.data, false);
 });
+
+test("only an exact copy of a template example is skipped, and the skip is counted", () => {
+  const ex = TEMPLATE_EXAMPLES[2]; // 회장 / President / 직책
+  const preview = classifyUpload(
+    [
+      { ...ex, rowNumber: 3 },
+      row(4, ex.korean, ex.english, { type: "", usageNote: "학생회장" }),
+    ],
+    []
+  );
+  assert.equal(preview.skippedExamples, 1);
+  assert.deepEqual(preview.newRows.map((r) => r.rowNumber), [4]);
+});

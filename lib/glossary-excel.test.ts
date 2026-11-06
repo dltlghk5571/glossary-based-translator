@@ -71,3 +71,19 @@ test("more than 2,000 data rows is rejected", async () => {
   for (let i = 0; i < 2001; i++) ws.addRow([`용어${i}`, `Term ${i}`]);
   assert.equal(await codeOf(readUploadRows(await toBuffer(wb))), "too_many_rows");
 });
+
+test("hyperlink, rich-text hyperlink, formula and date cells read as their displayed text", async () => {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("용어집");
+  ws.addRow(["한국어 용어", "영어 번역", "다른 표기", "사용 메모"]);
+  ws.addRow([
+    { text: "링크", hyperlink: "https://example.com" },
+    { text: { richText: [{ text: "Rich " }, { font: { bold: true }, text: "Link" }] }, hyperlink: "https://example.com" },
+    { formula: "\"계\"&\"산\"", result: "계산" },
+    new Date(Date.UTC(2026, 0, 5)),
+  ]);
+  const rows = await readUploadRows(await toBuffer(wb));
+  assert.deepEqual(rows, [
+    { rowNumber: 2, korean: "링크", english: "Rich Link", type: "", aliases: "계산", usageNote: "2026-01-05" },
+  ]);
+});

@@ -56,6 +56,19 @@ export async function buildTemplate(typeLabels: string[], examples: Omit<UploadR
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
+// The text a person sees in the cell. exceljs' `cell.text` is not always a
+// string: a hyperlink with mixed formatting yields { richText }, and a date
+// yields Date.toString() -- normalize both.
+function cellText(cell: ExcelJS.Cell): string {
+  if (cell.value instanceof Date) return cell.value.toISOString().slice(0, 10);
+  const t: unknown = cell.text;
+  if (typeof t === "string") return t.trim();
+  if (t && typeof t === "object" && "richText" in t && Array.isArray(t.richText)) {
+    return t.richText.map((r: { text?: string }) => r.text ?? "").join("").trim();
+  }
+  return String(t ?? "").trim();
+}
+
 export async function readUploadRows(buf: Buffer): Promise<UploadRow[]> {
   const wb = new ExcelJS.Workbook();
   try {
@@ -68,7 +81,7 @@ export async function readUploadRows(buf: Buffer): Promise<UploadRow[]> {
 
   const colOf: Partial<Record<(typeof COLUMNS)[number]["key"], number>> = {};
   ws.getRow(1).eachCell((cell, col) => {
-    const found = COLUMNS.find((c) => c.header === cell.text.trim());
+    const found = COLUMNS.find((c) => c.header === cellText(cell));
     if (found) colOf[found.key] = col;
   });
   if (!colOf.korean || !colOf.english) throw new UploadFormatError("missing_header");
@@ -76,7 +89,7 @@ export async function readUploadRows(buf: Buffer): Promise<UploadRow[]> {
   const rows: UploadRow[] = [];
   ws.eachRow((wsRow, rowNumber) => {
     if (rowNumber === 1) return;
-    const read = (key: (typeof COLUMNS)[number]["key"]) => (colOf[key] ? wsRow.getCell(colOf[key]!).text.trim() : "");
+    const read = (key: (typeof COLUMNS)[number]["key"]) => (colOf[key] ? cellText(wsRow.getCell(colOf[key]!)) : "");
     const r: UploadRow = {
       rowNumber,
       korean: read("korean"),

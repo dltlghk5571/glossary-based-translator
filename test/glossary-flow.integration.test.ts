@@ -405,7 +405,7 @@ test("suggestions: a term approved meanwhile shows as a collision and is kept by
   assert.deepEqual(item.collisions.map((c: { kind: string; termId: number }) => [c.kind, c.termId]), [["same_term", termId]]);
   assert.equal(item.existing[0].english, "Approved meanwhile");
 
-  const res = await decide(editor.id, item.id, { action: "accept" });
+  const res = await decide(editor.id, item.id, { action: "accept", seenCollisions: [`${termId}:${korean}`] });
   assert.deepEqual(res.body, { ok: true, result: "rejected" });
   assert.equal((await glossaryRow(korean)).english, "Approved meanwhile");
 });
@@ -418,7 +418,8 @@ test("suggestions: accepting with replace updates the existing term", async () =
   await suggest(user.id, { korean, english: "Suggested" });
   const { id } = await suggestionFor(korean);
 
-  const res = await decide(editor.id, id, { action: "accept", decisions: { [`${termId}:${korean}`]: "replace" } });
+  const key = `${termId}:${korean}`;
+  const res = await decide(editor.id, id, { action: "accept", decisions: { [key]: "replace" }, seenCollisions: [key] });
   assert.deepEqual(res.body, { ok: true, result: "accepted" });
   assert.equal((await glossaryRow(korean)).english, "Suggested");
 });
@@ -434,4 +435,36 @@ test("suggestions: reject leaves Glossary untouched", async () => {
   assert.deepEqual(res.body, { ok: true, result: "rejected" });
   assert.equal(await glossaryRow(korean), undefined);
   assert.equal((await suggestionFor(korean)).status, "rejected");
+});
+
+test("suggestions: a blank 분류 in a user's upload never resets the existing type on replace", async () => {
+  const user = await createUser("user");
+  const editor = await createUser("editor");
+  const korean = itestTerm();
+  const termId = await insertTerm(korean, "Old");
+  await db.query(`UPDATE "Glossary" SET type = 'Organization' WHERE id = $1`, [termId]);
+  await upload("apply", user.id, await xlsx([[korean, "Suggested"]]));
+  const { id } = await suggestionFor(korean);
+
+  const key = `${termId}:${korean}`;
+  const res = await decide(editor.id, id, { action: "accept", decisions: { [key]: "replace" }, seenCollisions: [key] });
+  assert.deepEqual(res.body, { ok: true, result: "accepted" });
+  const after = await glossaryRow(korean);
+  assert.equal(after.english, "Suggested");
+  assert.equal(after.type, "Organization");
+});
+
+test("suggestions: accepting after a collision appeared that the reviewer never saw is a 409 and changes nothing", async () => {
+  const user = await createUser("user");
+  const editor = await createUser("editor");
+  const korean = itestTerm();
+  await suggest(user.id, { korean, english: "Suggested" });
+  const { id } = await suggestionFor(korean);
+  await insertTerm(korean, "Approved meanwhile");
+
+  const res = await decide(editor.id, id, { action: "accept", seenCollisions: [] });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error, "collisions_changed");
+  assert.equal((await suggestionFor(korean)).status, "pending");
+  assert.equal((await glossaryRow(korean)).english, "Approved meanwhile");
 });

@@ -6,6 +6,8 @@ truth for the "Glossary" table's schema. This module only reads that same table
 with raw SQL, aliased back to glossary_manager.REQUIRED_COLUMNS shape so it drops
 straight into gm.match_terms() / gm.find_glossary_entry() unchanged.
 """
+import psycopg
+
 from db import get_connection
 
 _SELECT_COLUMNS = """
@@ -31,8 +33,14 @@ def fetch_glossary_rows():
 def fetch_pending_suggestion_koreans():
     """Korean terms with a pending GlossarySuggestion (Next.js 제안함). The
     analyzer treats these as not missing so users aren't asked again while a
-    reviewer hasn't decided yet."""
+    reviewer hasn't decided yet.
+
+    If the table doesn't exist yet (code deployed before `prisma migrate
+    deploy`), there are no pending suggestions -- analyze must keep working."""
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute('SELECT DISTINCT korean FROM "GlossarySuggestion" WHERE status = %s', ("pending",))
+            try:
+                cur.execute('SELECT DISTINCT korean FROM "GlossarySuggestion" WHERE status = %s', ("pending",))
+            except psycopg.errors.UndefinedTable:
+                return set()
             return {row["korean"] for row in cur.fetchall()}
