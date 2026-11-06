@@ -22,6 +22,27 @@ def stub_generate_fns(term_extraction_response="[]", translation_response="", re
 
 
 class AnalyzeTextTests(unittest.TestCase):
+    def setUp(self):
+        # analyze_text also reads pending suggestions; never hit a real DB here.
+        patcher = patch("web_pipeline.db_glossary.fetch_pending_suggestion_koreans", return_value=set())
+        self.mock_pending = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @patch("web_pipeline.db_glossary.fetch_glossary_rows")
+    @patch("web_pipeline.build_generate_fns")
+    def test_pending_suggestion_is_not_missing(self, mock_generate_fns, mock_fetch):
+        mock_fetch.return_value = GLOSSARY
+        self.mock_pending.return_value = {"신조어"}
+        term_extraction_json = json.dumps([
+            {"ko_term": "신조어", "type": "General", "context_sentence": "신조어가 등장했다.",
+             "suggested_translation": "New Term", "priority": "high"}
+        ], ensure_ascii=False)
+        mock_generate_fns.return_value = stub_generate_fns(term_extraction_response=term_extraction_json)
+
+        result = web_pipeline.analyze_text("중앙운영위원회와 신조어가 등장했다.")
+
+        self.assertEqual(result["missing_terms"], [])
+
     @patch("web_pipeline.db_glossary.fetch_glossary_rows")
     @patch("web_pipeline.build_generate_fns")
     def test_detects_missing_high_priority_term(self, mock_generate_fns, mock_fetch):

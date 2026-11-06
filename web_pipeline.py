@@ -30,7 +30,7 @@ class AccountSuspendedError(Exception):
         super().__init__("This account is suspended.")
 
 
-def _detect_missing_terms(candidate_terms, glossary):
+def _detect_missing_terms(candidate_terms, glossary, pending_koreans=frozenset()):
     missing = []
     seen_ko = set()
     for cand in candidate_terms:
@@ -39,6 +39,9 @@ def _detect_missing_terms(candidate_terms, glossary):
             continue
         seen_ko.add(ko_term)
 
+        # Already waiting in the reviewer's 제안함 -- don't ask again.
+        if ko_term in pending_koreans:
+            continue
         if gm.find_glossary_entry(glossary, ko_term) is not None:
             continue
         is_alias = any(
@@ -85,7 +88,7 @@ def analyze_text(text, user_id=None):
 
     candidate_terms = term_extractor.extract_candidate_terms(text, generate_fns["term_extraction"])
     matched_terms = gm.match_terms(text, glossary)
-    missing_terms = _detect_missing_terms(candidate_terms, glossary)
+    missing_terms = _detect_missing_terms(candidate_terms, glossary, db_glossary.fetch_pending_suggestion_koreans())
 
     if user_id is not None:
         try:

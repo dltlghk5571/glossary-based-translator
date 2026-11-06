@@ -26,3 +26,13 @@ def fetch_glossary_rows():
         with conn.cursor() as cur:
             cur.execute(f'SELECT {_SELECT_COLUMNS} FROM "Glossary" ORDER BY korean')
             return cur.fetchall()
+
+
+def fetch_pending_suggestion_koreans():
+    """Korean terms with a pending GlossarySuggestion (Next.js 제안함). The
+    analyzer treats these as not missing so users aren't asked again while a
+    reviewer hasn't decided yet."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute('SELECT DISTINCT korean FROM "GlossarySuggestion" WHERE status = %s', ("pending",))
+            return {row["korean"] for row in cur.fetchall()}
