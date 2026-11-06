@@ -12,7 +12,9 @@ Core features:
 - Glossary-driven Korean → English translation
 - Automatic detection of student-society terms that likely need a fixed translation
 - User confirmation for any high-priority term missing from the glossary
-- User-provided translations are automatically appended to the glossary
+- User-provided translations are added to the glossary (CLI: appended to `glossary.csv`; web:
+  sent to reviewers' 제안함 for approval)
+- Bulk glossary upload from an Excel template, with reviewers deciding every overlap
 - Placeholder-based protection of glossary terms during translation
 - Post-translation glossary compliance audit
 - Bounded repair loop (max 2 attempts) when the audit finds violations
@@ -156,7 +158,7 @@ Actually calling the LLM still needs an API key; only the *scoring* layer (`eval
 ## Tests
 
 ```bash
-python -m unittest test_translation_system test_evaluation test_web_pipeline test_api_handlers -v
+python -m unittest test_translation_system test_evaluation test_web_pipeline test_api_handlers test_db_users -v
 npm run lint
 npm run build
 npm run test              # lib/*.test.ts -- pure-logic unit tests, no DB/server needed
@@ -208,7 +210,8 @@ persistence paths that share one Postgres (Neon) database and one schema source 
 The CLI (`translator.py`) is unaffected and keeps using `glossary.csv` directly.
 
 **Accounts.** There's no shared password gate anymore -- real per-user accounts (`User` table:
-username, scrypt-hashed password, `role` of `admin`/`user`). Admins manage accounts from `/admin`
+username, scrypt-hashed password, `role` of `admin`/`editor`/`user`; `admin` and `editor` are
+glossary reviewers who can edit terms and decide 제안함). Admins manage accounts from `/admin`
 (create/delete/reset password; a freshly issued password is shown exactly once). The session is
 a `${userId}.${hmac}` cookie signed with `SESSION_SECRET` (`lib/auth.ts` on the Next.js side,
 mirrored in `api/index.py` for the Python routes so both can verify it without sharing a session
