@@ -96,7 +96,7 @@ export default function CollisionChoices({
                     checked={decision === "replace"}
                     onChange={() => onChange(key, "replace")}
                   />{" "}
-                  {incomingName}로 바꾸기
+                  {incomingName === "제안" ? "제안으로" : "엑셀로"} 바꾸기
                 </label>
               </div>
             )}
