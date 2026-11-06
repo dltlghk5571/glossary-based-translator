@@ -88,21 +88,63 @@ after(async () => {
   server.kill();
 });
 
-test("suggest: 'user' role can submit a missing term, but it always lands as pending_reference/translation_flow", async () => {
+async function suggest(userId: number, body: Record<string, unknown>) {
+  return fetch(`${BASE_URL}/api/glossary/suggest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: sessionCookie(userId) },
+    body: JSON.stringify(body),
+  });
+}
+
+test("suggest: 'user' role lands in the suggestion box as translation_flow, never in Glossary", async () => {
   const user = await createUser("user");
   const korean = `__itest_term_${randomUUID()}`;
   testTerms.push(korean);
 
-  const res = await fetch(`${BASE_URL}/api/glossary/suggest`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: sessionCookie(user.id) },
-    body: JSON.stringify({ korean, english: "Foo", status: "approved", source: "admin" }),
-  });
+  const res = await suggest(user.id, { korean, english: "Foo", status: "approved", source: "admin", lastContext: "문맥" });
   assert.equal(res.status, 200, await res.text());
 
-  const { rows } = await db.query(`SELECT status, source FROM "Glossary" WHERE korean = $1`, [korean]);
-  assert.equal(rows[0].status, "pending_reference");
-  assert.equal(rows[0].source, "translation_flow");
+  const { rows } = await db.query(`SELECT 1 FROM "Glossary" WHERE korean = $1`, [korean]);
+  assert.equal(rows.length, 0);
+  const s = await db.query(`SELECT status, source, "lastContext" FROM "GlossarySuggestion" WHERE korean = $1`, [korean]);
+  assert.deepEqual(s.rows, [{ status: "pending", source: "translation_flow", lastContext: "문맥" }]);
+});
+
+test("suggest: an approved term is left exactly as it was (the overwrite regression)", async () => {
+  const user = await createUser("user");
+  const korean = `__itest_term_${randomUUID()}`;
+  testTerms.push(korean);
+  await db.query(
+    `INSERT INTO "Glossary" (korean, english, aliases, status, source, "updatedAt") VALUES ($1, 'Approved', 'a1', 'approved', 'user', now())`,
+    [korean]
+  );
+  const before = await db.query(`SELECT * FROM "Glossary" WHERE korean = $1`, [korean]);
+
+  const res = await suggest(user.id, { korean, english: "Different" });
+  assert.equal(res.status, 200, await res.text());
+
+  const after = await db.query(`SELECT * FROM "Glossary" WHERE korean = $1`, [korean]);
+  assert.deepEqual(after.rows, before.rows);
+});
+
+test("suggest: the same user's repeat suggestion updates it; another user's is separate", async () => {
+  const a = await createUser("user");
+  const b = await createUser("user");
+  const korean = `__itest_term_${randomUUID()}`;
+  testTerms.push(korean);
+
+  await suggest(a.id, { korean, english: "First" });
+  await suggest(a.id, { korean, english: "Second" });
+  await suggest(b.id, { korean, english: "Other" });
+
+  const { rows } = await db.query(
+    `SELECT "userId", english FROM "GlossarySuggestion" WHERE korean = $1 ORDER BY id`,
+    [korean]
+  );
+  assert.deepEqual(rows, [
+    { userId: a.id, english: "Second" },
+    { userId: b.id, english: "Other" },
+  ]);
 });
 
 test("suggest: anonymous request is rejected with 401 and nothing is written", async () => {
@@ -303,4 +345,93 @@ test("apply (user): only creates pending suggestions, deduped per user on re-upl
   );
   assert.equal(rows.length, 2);
   assert.ok(rows.every((r) => r.source === "excel" && r.status === "pending"));
+});
+
+// ---- Suggestion box ----
+
+async function listSuggestions(userId: number) {
+  const res = await fetch(`${BASE_URL}/api/glossary/suggestions`, { headers: { Cookie: sessionCookie(userId) } });
+  return { status: res.status, body: res.status === 200 ? await res.json() : null };
+}
+
+async function decide(userId: number, id: number, body: Record<string, unknown>) {
+  const res = await fetch(`${BASE_URL}/api/glossary/suggestions/${id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: sessionCookie(userId) },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+async function suggestionFor(korean: string) {
+  const { rows } = await db.query(`SELECT id, status, "reviewedById" FROM "GlossarySuggestion" WHERE korean = $1`, [korean]);
+  return rows[0];
+}
+
+test("suggestions: regular users can't list them", async () => {
+  const user = await createUser("user");
+  assert.equal((await listSuggestions(user.id)).status, 401);
+});
+
+test("suggestions: accepting a new term approves it and records the reviewer", async () => {
+  const user = await createUser("user");
+  const editor = await createUser("editor");
+  const korean = itestTerm();
+  await suggest(user.id, { korean, english: "Suggested" });
+
+  const { body } = await listSuggestions(editor.id);
+  const item = body.suggestions.find((s: { korean: string }) => s.korean === korean);
+  assert.deepEqual(item.collisions, []);
+
+  const res = await decide(editor.id, item.id, { action: "accept" });
+  assert.deepEqual(res.body, { ok: true, result: "accepted" });
+  assert.deepEqual(await glossaryRow(korean), { english: "Suggested", aliases: "", type: "General", status: "approved", source: "translation_flow" });
+  const s = await suggestionFor(korean);
+  assert.equal(s.status, "accepted");
+  assert.equal(s.reviewedById, editor.id);
+
+  assert.equal((await decide(editor.id, item.id, { action: "accept" })).status, 409);
+});
+
+test("suggestions: a term approved meanwhile shows as a collision and is kept by default", async () => {
+  const user = await createUser("user");
+  const editor = await createUser("editor");
+  const korean = itestTerm();
+  await suggest(user.id, { korean, english: "Suggested" });
+  const termId = await insertTerm(korean, "Approved meanwhile");
+
+  const { body } = await listSuggestions(editor.id);
+  const item = body.suggestions.find((s: { korean: string }) => s.korean === korean);
+  assert.deepEqual(item.collisions.map((c: { kind: string; termId: number }) => [c.kind, c.termId]), [["same_term", termId]]);
+  assert.equal(item.existing[0].english, "Approved meanwhile");
+
+  const res = await decide(editor.id, item.id, { action: "accept" });
+  assert.deepEqual(res.body, { ok: true, result: "rejected" });
+  assert.equal((await glossaryRow(korean)).english, "Approved meanwhile");
+});
+
+test("suggestions: accepting with replace updates the existing term", async () => {
+  const user = await createUser("user");
+  const editor = await createUser("editor");
+  const korean = itestTerm();
+  const termId = await insertTerm(korean, "Old");
+  await suggest(user.id, { korean, english: "Suggested" });
+  const { id } = await suggestionFor(korean);
+
+  const res = await decide(editor.id, id, { action: "accept", decisions: { [`${termId}:${korean}`]: "replace" } });
+  assert.deepEqual(res.body, { ok: true, result: "accepted" });
+  assert.equal((await glossaryRow(korean)).english, "Suggested");
+});
+
+test("suggestions: reject leaves Glossary untouched", async () => {
+  const user = await createUser("user");
+  const editor = await createUser("editor");
+  const korean = itestTerm();
+  await suggest(user.id, { korean, english: "Suggested" });
+  const { id } = await suggestionFor(korean);
+
+  const res = await decide(editor.id, id, { action: "reject" });
+  assert.deepEqual(res.body, { ok: true, result: "rejected" });
+  assert.equal(await glossaryRow(korean), undefined);
+  assert.equal((await suggestionFor(korean)).status, "rejected");
 });

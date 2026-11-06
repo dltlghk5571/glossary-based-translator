@@ -18,13 +18,9 @@ export type GlossaryUpsertData = {
   lastContext: string;
 };
 
-// `overrides` always wins over client-supplied fields -- used to force
-// translate-flow suggestions to "pending_reference"/"translation_flow"
-// regardless of what the request body claims.
-export function buildGlossaryUpsertData(
-  body: Record<string, unknown>,
-  overrides: Partial<Pick<GlossaryUpsertData, "status" | "source">> = {}
-): GlossaryUpsertData {
+// Reviewer-side add/approve (/api/glossary/approve). Translate-flow suggestions
+// no longer write Glossary at all -- see app/api/glossary/suggest/route.ts.
+export function buildGlossaryUpsertData(body: Record<string, unknown>): GlossaryUpsertData {
   return {
     english: String(body.english ?? "").trim(),
     description: (body.description as string) ?? undefined,
@@ -32,8 +28,8 @@ export function buildGlossaryUpsertData(
     type: (body.type as string) || "General",
     aliases: (body.aliases as string) || "",
     usageNote: (body.usageNote as string) || "",
-    status: overrides.status ?? ((body.status as string) || "approved"),
-    source: overrides.source ?? ((body.source as string) || "user"),
+    status: (body.status as string) || "approved",
+    source: (body.source as string) || "user",
     lastContext: (body.lastContext as string) || "",
   };
 }
