@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import {
   TEMPLATE_EXAMPLES,
   classifyUpload,
+  collisionKey,
   findCollisions,
+  findSurfaceConflicts,
+  planApply,
+  type Collision,
   normalizeType,
   splitAliases,
   type ExistingTerm,
@@ -77,4 +81,65 @@ test("classifyUpload buckets rows and skips examples and blank rows", () => {
 test("classifyUpload normalizes the type label of kept rows", () => {
   const preview = classifyUpload([row(3, "신규", "New", { type: "기구" })], []);
   assert.equal(preview.newRows[0].type, "Organization");
+});
+
+const sameTerm: Collision = { termId: 1, termKorean: "총학생회", surface: "총학생회", kind: "same_term", canReplace: true };
+
+test("planApply: keeping a same_term collision skips the row", () => {
+  assert.deepEqual(planApply(row(3, "총학생회", "New"), [sameTerm], {}, "excel"), { kind: "skip" });
+});
+
+test("planApply: replacing a same_term collision updates only non-blank fields", () => {
+  const plan = planApply(
+    { ...row(3, "총학생회", "New"), type: "General" },
+    [sameTerm],
+    { [collisionKey(sameTerm)]: "replace" },
+    "excel"
+  );
+  assert.deepEqual(plan, {
+    kind: "update",
+    existingId: 1,
+    korean: "총학생회",
+    data: { english: "New", type: "General", status: "approved", source: "excel" },
+    aliasRemovals: [],
+  });
+});
+
+test("planApply: replace on a non-replaceable alias collision keeps it and drops the alias", () => {
+  const c: Collision = { termId: 2, termKorean: "학생회", surface: "학생회", kind: "surface", canReplace: false };
+  const plan = planApply({ ...row(3, "총학생회", "X", { aliases: "학생회, 총학" }), type: "General" }, [c], { [collisionKey(c)]: "replace" }, "excel");
+  assert.equal(plan.kind, "create");
+  if (plan.kind === "skip") return;
+  assert.equal(plan.data.aliases, "총학");
+  assert.deepEqual(plan.aliasRemovals, []);
+});
+
+test("planApply: own-korean collision moves the alias on replace and skips on keep", () => {
+  const c: Collision = { termId: 3, termKorean: "중앙운영위원회", surface: "중운위", kind: "surface", canReplace: true };
+  const r = { ...row(3, "중운위", "X"), type: "General" };
+  const plan = planApply(r, [c], { [collisionKey(c)]: "replace" }, "excel");
+  assert.equal(plan.kind, "create");
+  if (plan.kind === "skip") return;
+  assert.deepEqual(plan.aliasRemovals, [{ termId: 3, surface: "중운위" }]);
+  assert.deepEqual(planApply(r, [c], {}, "excel"), { kind: "skip" });
+});
+
+test("findSurfaceConflicts ignores conflicts outside the touched surfaces", () => {
+  const terms = [
+    { korean: "A", aliases: "B" },
+    { korean: "B", aliases: "" },
+    { korean: "C", aliases: "D" },
+    { korean: "D", aliases: "" },
+  ];
+  assert.deepEqual(findSurfaceConflicts(terms, new Set(["B"])), ["B"]);
+});
+
+test("a blank 분류 stays blank so replacing never resets the existing type", () => {
+  const preview = classifyUpload([row(3, "총학생회", "New")], [term(1, "총학생회", "", { type: "Organization" })]);
+  const r = preview.overlaps[0].row;
+  assert.equal(r.type, "");
+  const plan = planApply(r, preview.overlaps[0].collisions, { [collisionKey(sameTerm)]: "replace" }, "excel");
+  assert.equal(plan.kind, "update");
+  if (plan.kind === "skip") return;
+  assert.equal("type" in plan.data, false);
 });

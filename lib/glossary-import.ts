@@ -22,7 +22,9 @@ export type UploadRow = {
   usageNote: string;
 };
 
-// Same shape as UploadRow, with `type` already normalized to a GLOSSARY_TYPES value.
+// Same shape as UploadRow, with `type` normalized to a GLOSSARY_TYPES value --
+// or left "" when the cell was blank, so "바꾸기" never resets an existing type
+// (a create falls back to the Prisma default "General").
 export type NormalizedRow = UploadRow;
 
 export type ExistingTerm = {
@@ -134,10 +136,76 @@ export function classifyUpload(rows: UploadRow[], existing: ExistingTerm[]): Upl
       preview.problems.push({ rowNumber: r.rowNumber, korean: r.korean, reasons });
       return;
     }
-    const normalized: NormalizedRow = { ...r, type: type as string };
+    const normalized: NormalizedRow = { ...r, type: r.type.trim() ? (type as string) : "" };
     const collisions = findCollisions(normalized, existing);
     if (collisions.length) preview.overlaps.push({ row: normalized, collisions });
     else preview.newRows.push(normalized);
   });
   return preview;
+}
+
+export type Decision = "keep" | "replace";
+
+export type ApplyPlan =
+  | { kind: "skip" }
+  | {
+      kind: "create" | "update";
+      existingId?: number;
+      korean: string;
+      data: { english: string; type?: string; aliases?: string; usageNote?: string; status: "approved"; source: string };
+      aliasRemovals: { termId: number; surface: string }[];
+    };
+
+// Missing decisions, and "replace" where the collision can't be replaced, mean "keep".
+export function planApply(
+  row: NormalizedRow,
+  collisions: Collision[],
+  decisions: Record<string, Decision>,
+  source: string
+): ApplyPlan {
+  const wantsReplace = (c: Collision) => c.canReplace && decisions[collisionKey(c)] === "replace";
+  let existingId: number | undefined;
+  let aliases = splitAliases(row.aliases);
+  const aliasRemovals: { termId: number; surface: string }[] = [];
+
+  for (const c of collisions) {
+    if (c.kind === "same_term") {
+      if (!wantsReplace(c)) return { kind: "skip" };
+      existingId = c.termId;
+    } else if (c.surface === row.korean) {
+      if (!wantsReplace(c)) return { kind: "skip" };
+      aliasRemovals.push({ termId: c.termId, surface: c.surface });
+    } else if (wantsReplace(c)) {
+      aliasRemovals.push({ termId: c.termId, surface: c.surface });
+    } else {
+      aliases = aliases.filter((a) => a !== c.surface);
+    }
+  }
+
+  const data: Extract<ApplyPlan, { kind: "create" | "update" }>["data"] = { english: row.english, status: "approved", source };
+  if (row.type) data.type = row.type;
+  if (aliases.length) data.aliases = aliases.join(", ");
+  if (row.usageNote) data.usageNote = row.usageNote;
+
+  return existingId === undefined
+    ? { kind: "create", korean: row.korean, data, aliasRemovals }
+    : { kind: "update", existingId, korean: row.korean, data, aliasRemovals };
+}
+
+// Surfaces in `onlySurfaces` claimed by more than one term. Scoped so that
+// conflicts already present in legacy data never block an unrelated upload.
+export function findSurfaceConflicts(terms: { korean: string; aliases: string }[], onlySurfaces: Set<string>): string[] {
+  const counts = new Map<string, number>();
+  for (const t of terms) {
+    for (const s of new Set(surfacesOf(t))) {
+      if (onlySurfaces.has(s)) counts.set(s, (counts.get(s) || 0) + 1);
+    }
+  }
+  return [...counts].filter(([, n]) => n > 1).map(([s]) => s);
+}
+
+// Every surface form an apply plan writes, for the post-apply conflict check.
+export function planSurfaces(plan: ApplyPlan): string[] {
+  if (plan.kind === "skip") return [];
+  return [plan.korean, ...splitAliases(plan.data.aliases || "")];
 }
